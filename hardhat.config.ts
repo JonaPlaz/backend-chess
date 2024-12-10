@@ -1,7 +1,7 @@
-import { HardhatUserConfig } from "hardhat/config";
-import "@nomicfoundation/hardhat-toolbox";
+require("@nomicfoundation/hardhat-toolbox");
+require("@nomicfoundation/hardhat-verify");
 
-const config: HardhatUserConfig = {
+module.exports = {
   solidity: "0.8.27",
   networks: {
     localhost: {
@@ -10,5 +10,3 @@ const config: HardhatUserConfig = {
     },
   },
 };
-
-export default config;
