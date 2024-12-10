@@ -29,6 +29,7 @@ contract ChessFactory is Ownable {
     }
 
     mapping(address => User) public users;
+    address[] public userAddresses;
     mapping(address => address) public playerToGame;
     mapping(address => Game) public gameDetails;
 
@@ -74,7 +75,6 @@ contract ChessFactory is Ownable {
             "User already registered"
         );
         require(bytes(pseudo).length > 0, "Pseudo cannot be empty");
-        require(chessTokenAddress != address(0), "ChessToken address not set");
 
         require(
             platformBalance >= 100 * 10 ** 18,
@@ -88,7 +88,16 @@ contract ChessFactory is Ownable {
         });
 
         platformBalance -= 100 * 10 ** 18;
+        userAddresses.push(msg.sender);
         emit UserRegistered(msg.sender, pseudo, 100 * 10 ** 18);
+    }
+
+    function getAllUsers() public view returns (User[] memory) {
+        User[] memory allUsers = new User[](userAddresses.length);
+        for (uint256 i = 0; i < userAddresses.length; i++) {
+            allUsers[i] = users[userAddresses[i]];
+        }
+        return allUsers;
     }
 
     function createGame(
