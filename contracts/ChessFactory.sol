@@ -23,8 +23,7 @@ contract ChessFactory is Ownable {
         User player1;
         User player2;
         uint256 betAmount;
-        bool player1Joined;
-        bool player2Joined;
+        bool playerStarted; // Indique si les deux joueurs sont prêts
         uint256 startTime; // Heure de début de la partie (timestamp Unix)
     }
 
@@ -38,7 +37,14 @@ contract ChessFactory is Ownable {
         uint256 betAmount,
         uint256 startTime
     );
-    event PlayerJoined(address indexed gameAddress, address player);
+    event PlayerRegistered(address indexed gameAddress, address indexed player);
+    event GameStarted(
+        address indexed gameAddress,
+        address player1,
+        address player2,
+        uint256 betAmount,
+        uint256 startTime
+    );
     event UserRegistered(
         address indexed user,
         string pseudo,
@@ -118,47 +124,75 @@ contract ChessFactory is Ownable {
             player1: User({userAddress: address(0), pseudo: "", balance: 0}),
             player2: User({userAddress: address(0), pseudo: "", balance: 0}),
             betAmount: betAmount,
-            player1Joined: false,
-            player2Joined: false,
+            playerStarted: false,
             startTime: startTime
         });
 
         emit GameCreated(clone, betAmount, startTime);
     }
 
-    function joinGame(address gameAddress) external {
+    function registerToGame(address gameAddress) external {
         Game storage game = gameDetails[gameAddress];
         User storage user = users[msg.sender];
 
         require(game.gameAddress != address(0), "Game does not exist");
         require(user.userAddress != address(0), "User not registered");
         require(user.balance >= game.betAmount, "Insufficient balance");
-        require(playerToGame[msg.sender] == address(0), "Already in a game");
-        require(!game.player2Joined, "Game is already full");
+        require(
+            playerToGame[msg.sender] == address(0),
+            "Already registered to a game"
+        );
+        require(
+            game.player1.userAddress == address(0) ||
+                game.player2.userAddress == address(0),
+            "Game is already full"
+        );
 
-        if (!game.player1Joined) {
+        if (game.player1.userAddress == address(0)) {
             game.player1 = user;
-            game.player1Joined = true;
-            ChessTemplate(game.gameAddress).initialize(
-                msg.sender,
-                address(0),
-                game.betAmount
-            );
-        } else if (!game.player2Joined) {
+        } else if (game.player2.userAddress == address(0)) {
             game.player2 = user;
-            game.player2Joined = true;
-            ChessTemplate(game.gameAddress).initialize(
-                game.player1.userAddress,
-                msg.sender,
-                game.betAmount
-            );
         }
 
         user.balance -= game.betAmount;
         platformBalance += game.betAmount;
 
         playerToGame[msg.sender] = gameAddress;
-        emit PlayerJoined(gameAddress, msg.sender);
+
+        emit PlayerRegistered(gameAddress, msg.sender);
+    }
+
+    function startGame(address gameAddress) external {
+        Game storage game = gameDetails[gameAddress];
+
+        require(game.gameAddress != address(0), "Game does not exist");
+        require(
+            game.player1.userAddress != address(0),
+            "Player 1 not registered"
+        );
+        require(
+            game.player2.userAddress != address(0),
+            "Player 2 not registered"
+        );
+        require(game.playerStarted, "Players are not ready");
+        require(
+            block.timestamp >= game.startTime,
+            "Game start time not reached"
+        );
+
+        ChessTemplate(game.gameAddress).initialize(
+            game.player1.userAddress,
+            game.player2.userAddress,
+            game.betAmount
+        );
+
+        emit GameStarted(
+            gameAddress,
+            game.player1.userAddress,
+            game.player2.userAddress,
+            game.betAmount,
+            block.timestamp
+        );
     }
 
     function endGame(
