@@ -106,6 +106,13 @@ contract ChessFactory is Ownable {
         return allUsers;
     }
 
+    function getUser() external view returns (User memory) {
+        User storage user = users[msg.sender];
+        require(user.userAddress != address(0), "User not registered");
+
+        return user;
+    }
+
     function createGame(
         uint256 betAmount,
         uint256 startTime
@@ -224,5 +231,14 @@ contract ChessFactory is Ownable {
             allGames[i] = gameDetails[games[i]];
         }
         return allGames;
+    }
+
+    function getGameDetails(
+        address gameAddress
+    ) external view returns (Game memory) {
+        Game storage game = gameDetails[gameAddress];
+        require(game.gameAddress != address(0), "Game does not exist");
+
+        return game;
     }
 }
