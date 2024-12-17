@@ -23,7 +23,6 @@ contract ChessFactory is Ownable {
         User player1;
         User player2;
         uint256 betAmount;
-        bool playerStarted; // Indique si les deux joueurs sont prêts
         uint256 startTime; // Heure de début de la partie (timestamp Unix)
     }
 
@@ -124,6 +123,8 @@ contract ChessFactory is Ownable {
         );
 
         address clone = Clones.clone(templateAddress);
+        ChessTemplate(clone).initialize(address(0), address(0), betAmount);
+
         games.push(clone);
 
         gameDetails[clone] = Game({
@@ -131,7 +132,6 @@ contract ChessFactory is Ownable {
             player1: User({userAddress: address(0), pseudo: "", balance: 0}),
             player2: User({userAddress: address(0), pseudo: "", balance: 0}),
             betAmount: betAmount,
-            playerStarted: false,
             startTime: startTime
         });
 
@@ -157,8 +157,10 @@ contract ChessFactory is Ownable {
 
         if (game.player1.userAddress == address(0)) {
             game.player1 = user;
+            ChessTemplate(game.gameAddress).setPlayer1(user.userAddress);
         } else if (game.player2.userAddress == address(0)) {
             game.player2 = user;
+            ChessTemplate(game.gameAddress).setPlayer2(user.userAddress);
         }
 
         user.balance -= game.betAmount;
@@ -169,7 +171,7 @@ contract ChessFactory is Ownable {
         emit PlayerRegistered(gameAddress, msg.sender);
     }
 
-    function startGame(address gameAddress) external {
+    function joinGame(address gameAddress) external {
         Game storage game = gameDetails[gameAddress];
 
         require(game.gameAddress != address(0), "Game does not exist");
@@ -181,16 +183,9 @@ contract ChessFactory is Ownable {
             game.player2.userAddress != address(0),
             "Player 2 not registered"
         );
-        require(game.playerStarted, "Players are not ready");
         require(
             block.timestamp >= game.startTime,
             "Game start time not reached"
-        );
-
-        ChessTemplate(game.gameAddress).initialize(
-            game.player1.userAddress,
-            game.player2.userAddress,
-            game.betAmount
         );
 
         emit GameStarted(
@@ -200,29 +195,6 @@ contract ChessFactory is Ownable {
             game.betAmount,
             block.timestamp
         );
-    }
-
-    function endGame(
-        address gameAddress,
-        address winner,
-        uint8 outcome
-    ) external onlyOwner {
-        Game storage game = gameDetails[gameAddress];
-
-        require(game.gameAddress != address(0), "Game does not exist");
-        require(outcome != 0, "Game has not ended yet");
-
-        uint256 totalBet = game.betAmount * 2;
-        uint256 platformFee = totalBet / 20; // 5%
-        uint256 winnerReward = totalBet - platformFee;
-
-        platformBalance -= winnerReward;
-
-        if (winner != address(0)) {
-            users[winner].balance += winnerReward;
-        }
-
-        emit GameEnded(gameAddress, winner, winnerReward, platformFee);
     }
 
     function getAllGameDetails() external view returns (Game[] memory) {
