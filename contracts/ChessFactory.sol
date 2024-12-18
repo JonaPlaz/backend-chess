@@ -123,6 +123,8 @@ contract ChessFactory is Ownable {
         );
 
         address clone = Clones.clone(templateAddress);
+
+        // Initialise avec gameActive = false
         ChessTemplate(clone).initialize(address(0), address(0), betAmount);
 
         games.push(clone);
@@ -161,6 +163,9 @@ contract ChessFactory is Ownable {
         } else if (game.player2.userAddress == address(0)) {
             game.player2 = user;
             ChessTemplate(game.gameAddress).setPlayer2(user.userAddress);
+
+            // Active la partie après l'enregistrement des deux joueurs
+            ChessTemplate(game.gameAddress).setGameActive();
         }
 
         user.balance -= game.betAmount;
@@ -173,7 +178,6 @@ contract ChessFactory is Ownable {
 
     function joinGame(address gameAddress) external {
         Game storage game = gameDetails[gameAddress];
-
         require(game.gameAddress != address(0), "Game does not exist");
         require(
             game.player1.userAddress != address(0),
@@ -182,6 +186,10 @@ contract ChessFactory is Ownable {
         require(
             game.player2.userAddress != address(0),
             "Player 2 not registered"
+        );
+        require(
+            ChessTemplate(gameAddress).isGameActive(),
+            "Game is not active"
         );
         require(
             block.timestamp >= game.startTime,
