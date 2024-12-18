@@ -14,6 +14,10 @@ export default async function registerUsers() {
     { signer: signers[3], name: config.factory.userNames[2] },
   ];
 
+  // ABI de l'événement pour le décodage
+  const abi = ["event UserRegistered(address indexed userAddress, string pseudo, uint256 balance)"];
+  const iface = new hre.ethers.Interface(abi);
+
   // Boucler pour enregistrer chaque utilisateur
   for (const user of users) {
     console.log(`Registering user: ${user.name} with address: ${user.signer.address}...`);
@@ -31,7 +35,40 @@ export default async function registerUsers() {
 
     // Attendre la confirmation de la transaction
     const receipt = await tx.wait();
-    console.log(`User ${user.name} registered successfully! Transaction Hash: ${tx.hash}`);
+    console.log(`Transaction receipt:`, receipt);
+
+    // Rechercher et décoder l'événement `UserRegistered`
+    const userRegisteredEvent = receipt.logs.find((log) => {
+      try {
+        const parsedLog = iface.parseLog(log);
+        return parsedLog.name === "UserRegistered";
+      } catch (error) {
+        return false;
+      }
+    });
+
+    if (userRegisteredEvent) {
+      // Décoder l'événement
+      const parsedEvent = iface.parseLog(userRegisteredEvent);
+
+      // Convertir les `BigInt` en chaînes pour affichage
+      const eventDetails = JSON.stringify(
+        parsedEvent,
+        (key, value) => (typeof value === "bigint" ? value.toString() : value),
+        2
+      );
+
+      console.log("UserRegistered Event Details:");
+      console.log(eventDetails);
+
+      // Afficher les arguments principaux séparément
+      const { userAddress, pseudo, balance } = parsedEvent.args;
+      console.log(`User Address: ${userAddress}`);
+      console.log(`Pseudo: ${pseudo}`);
+      console.log(`Balance: ${balance}`);
+    } else {
+      console.error("UserRegistered event not found in transaction logs.");
+    }
   }
 
   console.log("All users registered successfully!");
