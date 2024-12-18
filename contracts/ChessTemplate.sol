@@ -7,12 +7,11 @@ contract ChessTemplate is ChessControl {
     address public player1;
     address public player2;
     uint256 public betAmount;
-    bool public gameActive;
+    bool public gameActive = false;
 
     event GameStarted(address player1, address player2, uint256 betAmount);
     event MovePlayed(address player, uint16 move);
     event GameEnded(uint16 outcome, address winner);
-    event DebugMoveReceived(uint16[] moves);
 
     error AlreadyInitialized();
     error NotParticipant();
@@ -20,6 +19,10 @@ contract ChessTemplate is ChessControl {
     error NotYourTurn();
 
     modifier onlyPlayers() {
+        require(
+            player1 != address(0) && player2 != address(0),
+            "Players not registered"
+        );
         require(
             msg.sender == player1 || msg.sender == player2,
             "Not a participant"
@@ -41,9 +44,13 @@ contract ChessTemplate is ChessControl {
         player1 = _player1;
         player2 = _player2;
         betAmount = _betAmount;
-        gameActive = true;
 
+        gameActive = false; // La partie est inactive par défaut
         emit GameStarted(player1, player2, betAmount);
+    }
+
+    function isGameActive() external view returns (bool) {
+        return gameActive;
     }
 
     /// @notice Sets Player 1's address
@@ -58,14 +65,24 @@ contract ChessTemplate is ChessControl {
         player2 = _player2;
     }
 
+    function setGameActive() external {
+        require(
+            player1 != address(0) && player2 != address(0),
+            "Players not registered"
+        );
+        require(!gameActive, "Game is already active");
+
+        gameActive = true;
+    }
+
+    event DebugPlayMove(uint16[] moves, address player);
     /// @notice Validates and plays moves in sequence
     /// @param moves The list of moves played so far
     function playMove(uint16[] memory moves) external onlyPlayers {
-        emit DebugMoveReceived(moves); // Log temporaire pour le débogage
         require(gameActive, "Game has ended");
 
         // Validation de la partie entière via checkGameFromStart
-        (uint16 outcome, , , ) = checkGameFromStart(moves);
+        (uint8 outcome, , , ) = checkGameFromStart(moves);
 
         // Envoie un event pour indiquer le dernier coup joué
         emit MovePlayed(msg.sender, moves[moves.length - 1]);
