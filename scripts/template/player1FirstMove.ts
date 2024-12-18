@@ -20,15 +20,72 @@ const encodeMove = (from, to) => {
   return encodedMove;
 };
 
+// Vérifie si un contrat existe à une adresse donnée
+async function isContractDeployed(address) {
+  const code = await hre.ethers.provider.getCode(address);
+  return code !== "0x"; // Si "0x", aucun contrat n'est déployé à cette adresse
+}
+
+// Interagit avec le contrat pour jouer un mouvement
+async function interactWithContract(chessTemplate, move) {
+  console.log("Playing the first move...");
+  const tx = await chessTemplate.playMove([move]);
+  const receipt = await tx.wait();
+
+  console.log(`Move played successfully! Transaction Hash: ${tx.hash}`);
+  return receipt;
+}
+
 // Fonction pour jouer un mouvement
 async function playMove(move) {
   const player1 = (await hre.ethers.getSigners())[1];
-  const chessTemplate = await hre.ethers.getContractAt("ChessTemplate", config.factory.firstGame, player1);
+  const contractAddress = config.factory.firstGame;
 
-  console.log("Playing the first move...");
-  const tx = await chessTemplate.playMove([move]);
-  await tx.wait();
-  console.log(`Move played successfully! Transaction Hash: ${tx.hash}`);
+  console.log(`Using ChessTemplate at address: ${contractAddress}`);
+
+  // Vérifie si un contrat est déployé à l'adresse
+  const exists = await isContractDeployed(contractAddress);
+  if (!exists) {
+    throw new Error("No contract deployed at this address.");
+  }
+
+  const chessTemplate = await hre.ethers.getContractAt("ChessTemplate", contractAddress, player1);
+
+  // Vérifie l'état du jeu
+  const isActive = await chessTemplate.isGameActive();
+  console.log(`Game active status: ${isActive}`);
+
+  if (!isActive) {
+    console.error("Game is not active. Aborting playMove.");
+    return;
+  }
+
+  // Joue le mouvement
+  const receipt = await interactWithContract(chessTemplate, move);
+
+  // Décodage de l'événement `MovePlayed`
+  const abi = ["event MovePlayed(address indexed player, uint16 move)"];
+  const iface = new hre.ethers.Interface(abi);
+
+  const movePlayedEvent = receipt.logs.find((log) => {
+    try {
+      const parsedLog = iface.parseLog(log);
+      return parsedLog.name === "MovePlayed";
+    } catch (error) {
+      return false;
+    }
+  });
+
+  if (movePlayedEvent) {
+    const parsedEvent = iface.parseLog(movePlayedEvent);
+
+    console.log("MovePlayed Event Details:");
+    console.log(`Player: ${parsedEvent.args.player}`);
+    console.log(`Move: ${parsedEvent.args.move}`);
+  } else {
+    console.error("MovePlayed event not found in transaction logs.");
+    console.log("Logs:", receipt.logs);
+  }
 }
 
 // Exécution principale
