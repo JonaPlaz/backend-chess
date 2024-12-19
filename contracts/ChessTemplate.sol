@@ -75,7 +75,6 @@ contract ChessTemplate is ChessControl {
         gameActive = true;
     }
 
-    event DebugPlayMove(uint16[] moves, address player);
     /// @notice Validates and plays moves in sequence
     /// @param moves The list of moves played so far
     function playMove(uint16[] memory moves) external onlyPlayers {
