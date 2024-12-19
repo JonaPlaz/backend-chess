@@ -7,218 +7,152 @@ import "@openzeppelin/contracts/proxy/Clones.sol";
 import "./ChessTemplate.sol";
 
 contract ChessFactory is Ownable {
-    address public templateAddress;
-    address public chessTokenAddress;
-    uint256 public platformBalance;
-    address[] public games;
+	address public templateAddress;
+	address public chessTokenAddress;
+	uint256 public platformBalance;
+	address[] public games;
 
-    struct User {
-        address userAddress;
-        string pseudo;
-        uint256 balance; // Balance des tokens sur la plateforme
-    }
+	struct User {
+		address userAddress;
+		string pseudo;
+		uint256 balance; // Balance des tokens sur la plateforme
+	}
 
-    struct Game {
-        address gameAddress;
-        User player1;
-        User player2;
-        uint256 betAmount;
-        uint256 startTime; // Heure de début de la partie (timestamp Unix)
-    }
+	struct Game {
+		address gameAddress;
+		User player1;
+		User player2;
+		uint256 betAmount;
+		uint256 startTime; // Heure de début de la partie (timestamp Unix)
+	}
 
-    mapping(address => User) public users;
-    address[] public userAddresses;
-    mapping(address => address) public playerToGame;
-    mapping(address => Game) public gameDetails;
+	mapping(address => User) public users;
+	address[] public userAddresses;
+	mapping(address => address) public playerToGame;
+	mapping(address => Game) public gameDetails;
 
-    event GameCreated(
-        address indexed gameAddress,
-        uint256 betAmount,
-        uint256 startTime
-    );
-    event PlayerRegistered(address indexed gameAddress, address indexed player);
-    event GameStarted(
-        address indexed gameAddress,
-        address player1,
-        address player2,
-        uint256 betAmount,
-        uint256 startTime
-    );
-    event UserRegistered(
-        address indexed user,
-        string pseudo,
-        uint256 initialBalance
-    );
-    event GameEnded(
-        address indexed gameAddress,
-        address winner,
-        uint256 winnerReward,
-        uint256 platformFee
-    );
+	event GameCreated(address indexed gameAddress, uint256 betAmount, uint256 startTime);
+	event PlayerRegistered(address indexed gameAddress, address indexed player);
+	event GameStarted(address indexed gameAddress, address player1, address player2, uint256 betAmount, uint256 startTime);
+	event UserRegistered(address indexed user, string pseudo, uint256 initialBalance);
+	event GameEnded(address indexed gameAddress, address winner, uint256 winnerReward, uint256 platformFee);
 
-    constructor(address _templateAddress) Ownable(msg.sender) {
-        templateAddress = _templateAddress;
-    }
+	constructor(address _templateAddress) Ownable(msg.sender) {
+		templateAddress = _templateAddress;
+	}
 
-    function setChessToken(address _chessToken) external onlyOwner {
-        chessTokenAddress = _chessToken;
-    }
+	function setChessToken(address _chessToken) external onlyOwner {
+		chessTokenAddress = _chessToken;
+	}
 
-    function depositTokens(uint256 amount) external onlyOwner {
-        require(chessTokenAddress != address(0), "ChessToken address not set");
-        IERC20(chessTokenAddress).transferFrom(
-            msg.sender,
-            address(this),
-            amount
-        );
-        platformBalance += amount;
-    }
+	function depositTokens(uint256 amount) external onlyOwner {
+		require(chessTokenAddress != address(0), "ChessToken address not set");
+		IERC20(chessTokenAddress).transferFrom(msg.sender, address(this), amount);
+		platformBalance += amount;
+	}
 
-    function registerUser(string memory pseudo) external {
-        require(
-            users[msg.sender].userAddress == address(0),
-            "User already registered"
-        );
-        require(bytes(pseudo).length > 0, "Pseudo cannot be empty");
+	function registerUser(string memory pseudo) external {
+		require(users[msg.sender].userAddress == address(0), "User already registered");
+		require(bytes(pseudo).length > 0, "Pseudo cannot be empty");
 
-        require(
-            platformBalance >= 100 * 10 ** 18,
-            "Insufficient platform balance"
-        );
+		require(platformBalance >= 100 * 10 ** 18, "Insufficient platform balance");
 
-        users[msg.sender] = User({
-            userAddress: msg.sender,
-            pseudo: pseudo,
-            balance: 100 * 10 ** 18
-        });
+		users[msg.sender] = User({userAddress: msg.sender, pseudo: pseudo, balance: 100 * 10 ** 18});
 
-        platformBalance -= 100 * 10 ** 18;
-        userAddresses.push(msg.sender);
-        emit UserRegistered(msg.sender, pseudo, 100 * 10 ** 18);
-    }
+		platformBalance -= 100 * 10 ** 18;
+		userAddresses.push(msg.sender);
+		emit UserRegistered(msg.sender, pseudo, 100 * 10 ** 18);
+	}
 
-    function getAllUsers() public view returns (User[] memory) {
-        User[] memory allUsers = new User[](userAddresses.length);
-        for (uint256 i = 0; i < userAddresses.length; i++) {
-            allUsers[i] = users[userAddresses[i]];
-        }
-        return allUsers;
-    }
+	function getAllUsers() public view returns (User[] memory) {
+		User[] memory allUsers = new User[](userAddresses.length);
+		for (uint256 i = 0; i < userAddresses.length; i++) {
+			allUsers[i] = users[userAddresses[i]];
+		}
+		return allUsers;
+	}
 
-    function getUser() external view returns (User memory) {
-        User storage user = users[msg.sender];
-        require(user.userAddress != address(0), "User not registered");
+	function getUser() external view returns (User memory) {
+		User storage user = users[msg.sender];
+		require(user.userAddress != address(0), "User not registered");
 
-        return user;
-    }
+		return user;
+	}
 
-    function createGame(
-        uint256 betAmount,
-        uint256 startTime
-    ) external onlyOwner {
-        require(betAmount > 0, "Bet amount must be greater than 0");
-        require(
-            startTime > block.timestamp,
-            "Start time must be in the future"
-        );
+	function createGame(uint256 betAmount, uint256 startTime) external onlyOwner {
+		require(betAmount > 0, "Bet amount must be greater than 0");
+		require(startTime > block.timestamp, "Start time must be in the future");
 
-        address clone = Clones.clone(templateAddress);
+		address clone = Clones.clone(templateAddress);
 
-        // Initialise avec gameActive = false
-        ChessTemplate(clone).initialize(address(0), address(0), betAmount);
+		// Initialise avec gameActive = false
+		ChessTemplate(clone).initialize(address(0), address(0), betAmount);
 
-        games.push(clone);
+		games.push(clone);
 
-        gameDetails[clone] = Game({
-            gameAddress: clone,
-            player1: User({userAddress: address(0), pseudo: "", balance: 0}),
-            player2: User({userAddress: address(0), pseudo: "", balance: 0}),
-            betAmount: betAmount,
-            startTime: startTime
-        });
+		gameDetails[clone] = Game({
+			gameAddress: clone,
+			player1: User({userAddress: address(0), pseudo: "", balance: 0}),
+			player2: User({userAddress: address(0), pseudo: "", balance: 0}),
+			betAmount: betAmount,
+			startTime: startTime
+		});
 
-        emit GameCreated(clone, betAmount, startTime);
-    }
+		emit GameCreated(clone, betAmount, startTime);
+	}
 
-    function registerToGame(address gameAddress) external {
-        Game storage game = gameDetails[gameAddress];
-        User storage user = users[msg.sender];
+	function registerToGame(address gameAddress) external {
+		Game storage game = gameDetails[gameAddress];
+		User storage user = users[msg.sender];
 
-        require(game.gameAddress != address(0), "Game does not exist");
-        require(user.userAddress != address(0), "User not registered");
-        require(user.balance >= game.betAmount, "Insufficient balance");
-        require(
-            playerToGame[msg.sender] == address(0),
-            "Already registered to a game"
-        );
-        require(
-            game.player1.userAddress == address(0) ||
-                game.player2.userAddress == address(0),
-            "Game is already full"
-        );
+		require(game.gameAddress != address(0), "Game does not exist");
+		require(user.userAddress != address(0), "User not registered");
+		require(user.balance >= game.betAmount, "Insufficient balance");
+		require(playerToGame[msg.sender] == address(0), "Already registered to a game");
+		require(game.player1.userAddress == address(0) || game.player2.userAddress == address(0), "Game is already full");
 
-        if (game.player1.userAddress == address(0)) {
-            game.player1 = user;
-            ChessTemplate(game.gameAddress).setPlayer1(user.userAddress);
-        } else if (game.player2.userAddress == address(0)) {
-            game.player2 = user;
-            ChessTemplate(game.gameAddress).setPlayer2(user.userAddress);
+		if (game.player1.userAddress == address(0)) {
+			game.player1 = user;
+			ChessTemplate(game.gameAddress).setPlayer1(user.userAddress);
+		} else if (game.player2.userAddress == address(0)) {
+			game.player2 = user;
+			ChessTemplate(game.gameAddress).setPlayer2(user.userAddress);
 
-            // Active la partie après l'enregistrement des deux joueurs
-            ChessTemplate(game.gameAddress).setGameActive();
-        }
+			// Active la partie après l'enregistrement des deux joueurs
+			ChessTemplate(game.gameAddress).setGameActive();
+		}
 
-        user.balance -= game.betAmount;
-        platformBalance += game.betAmount;
+		user.balance -= game.betAmount;
+		platformBalance += game.betAmount;
 
-        playerToGame[msg.sender] = gameAddress;
+		playerToGame[msg.sender] = gameAddress;
 
-        emit PlayerRegistered(gameAddress, msg.sender);
-    }
+		emit PlayerRegistered(gameAddress, msg.sender);
+	}
 
-    function joinGame(address gameAddress) external {
-        Game storage game = gameDetails[gameAddress];
-        require(game.gameAddress != address(0), "Game does not exist");
-        require(
-            game.player1.userAddress != address(0),
-            "Player 1 not registered"
-        );
-        require(
-            game.player2.userAddress != address(0),
-            "Player 2 not registered"
-        );
-        require(
-            ChessTemplate(gameAddress).isGameActive(),
-            "Game is not active"
-        );
-        require(
-            block.timestamp >= game.startTime,
-            "Game start time not reached"
-        );
+	function joinGame(address gameAddress) external {
+		Game storage game = gameDetails[gameAddress];
+		require(game.gameAddress != address(0), "Game does not exist");
+		require(game.player1.userAddress != address(0), "Player 1 not registered");
+		require(game.player2.userAddress != address(0), "Player 2 not registered");
+		require(ChessTemplate(gameAddress).isGameActive(), "Game is not active");
+		require(block.timestamp >= game.startTime, "Game start time not reached");
 
-        emit GameStarted(
-            gameAddress,
-            game.player1.userAddress,
-            game.player2.userAddress,
-            game.betAmount,
-            block.timestamp
-        );
-    }
+		emit GameStarted(gameAddress, game.player1.userAddress, game.player2.userAddress, game.betAmount, block.timestamp);
+	}
 
-    function getAllGameDetails() external view returns (Game[] memory) {
-        Game[] memory allGames = new Game[](games.length);
-        for (uint256 i = 0; i < games.length; i++) {
-            allGames[i] = gameDetails[games[i]];
-        }
-        return allGames;
-    }
+	function getAllGameDetails() external view returns (Game[] memory) {
+		Game[] memory allGames = new Game[](games.length);
+		for (uint256 i = 0; i < games.length; i++) {
+			allGames[i] = gameDetails[games[i]];
+		}
+		return allGames;
+	}
 
-    function getGameDetails(
-        address gameAddress
-    ) external view returns (Game memory) {
-        Game storage game = gameDetails[gameAddress];
-        require(game.gameAddress != address(0), "Game does not exist");
+	function getGameDetails(address gameAddress) external view returns (Game memory) {
+		Game storage game = gameDetails[gameAddress];
+		require(game.gameAddress != address(0), "Game does not exist");
 
-        return game;
-    }
+		return game;
+	}
 }
