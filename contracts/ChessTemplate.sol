@@ -7,6 +7,7 @@ import "./ChessFactory.sol";
 // si partie gagnée, abandon ou draw gameActive = false mais impossible de le repaser à true !! SECURITE trop facile d'utiliser setGameActive
 // ajouter fonction abandon si joueur ne joue pas dans les temps : temps à définir
 // déterminer le montant des récompenses ici
+// le draw est automatiquement accepté si l'autre joueur ne répond pas dans un certain délai : temps à définir
 contract ChessTemplate is ChessControl {
 	address public player1;
 	address public player2;

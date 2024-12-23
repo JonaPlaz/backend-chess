@@ -8,6 +8,16 @@ import "./ChessTemplate.sol";
 
 // ajouter withdrawTokens pour récupérer les tokens du contrat
 // utiliser call et non transfer pour les tokens
+// regarder instructions si user peut s'inscrire à plusieurs parties simultanément
+
+// modifier registerToGame et createGame en conséquence
+// achat du token contre de l'ether contre du chess : à définir le don de chess à l'inscription
+// achat du token 1 chess pour 0.000001 ether = à la mise d'une partie
+// acheter sur le contrat ou acheter sur la plateforme
+
+// plateforme 500 et 1500 au vainqueur
+// égalite plateforme : 500 : 750 à chaque joueur - joueur perd 250 chess
+// faut il burner du token en fin de partie - pourquoi ? par la plateforme ou par le contrat token directement
 contract ChessFactory is Ownable {
 	address public templateAddress;
 	address public chessTokenAddress;
