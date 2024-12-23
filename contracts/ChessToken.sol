@@ -5,6 +5,8 @@ pragma solidity 0.8.27;
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
+// faut il burner des tokens
+// comment se décide la quantité de mint ?
 contract ChessToken is ERC20, Ownable {
 	// L'adresse du contrat ChessFactory pour autoriser des fonctionnalités spécifiques
 	address public chessFactory;
