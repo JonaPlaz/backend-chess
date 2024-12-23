@@ -93,6 +93,26 @@ contract ChessFactory is Ownable {
 		return user;
 	}
 
+	function buyChessTokens(uint256 amountInEth) external payable {
+		require(amountInEth > 0, "Amount must be greater than 0");
+		require(msg.value == amountInEth, "Sent Ether does not match specified amount");
+		require(chessTokenAddress != address(0), "ChessToken address not set");
+
+		uint256 amountToBuy = (amountInEth * 10 ** 18) / 0.000001 ether;
+
+		// Vérifie que la plateforme a assez de tokens Chess en réserve
+		require(platformBalance >= amountToBuy, "Not enough ChessTokens in the platform balance");
+
+		// Augmente la balance de l'utilisateur en Chess
+		users[msg.sender].balance += amountToBuy;
+
+		// Réduit la balance disponible de la plateforme
+		platformBalance -= amountToBuy;
+
+		// Émission d'un événement pour traçabilité
+		emit ChessTokensPurchased(msg.sender, msg.value, amountToBuy);
+	}
+
 	function createGame(uint256 betAmount, uint256 startTime) external onlyOwner {
 		require(betAmount > 0, "Bet amount must be greater than 0");
 		require(startTime > block.timestamp, "Start time must be in the future");
