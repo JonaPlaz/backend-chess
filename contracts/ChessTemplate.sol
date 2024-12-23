@@ -18,6 +18,8 @@ contract ChessTemplate is ChessControl {
 	address private owner;
 	address public chessFactory;
 	address public abandoner;
+	bool public drawProposed;
+	address public proposer;
 
 	enum GameStatus {
 		Inactive,
@@ -30,6 +32,8 @@ contract ChessTemplate is ChessControl {
 
 	event GameStarted(address player1, address player2, uint256 betAmount);
 	event MovePlayed(address player, uint16 move);
+	event DrawProposed(address proposer);
+	event DrawAccepted(address proposer, address accepter);
 	event GameAbandoned(address loser, address winner);
 	event GameEnded(uint16 outcome, address winner);
 
@@ -52,6 +56,7 @@ contract ChessTemplate is ChessControl {
 		player2 = _player2;
 		betAmount = _betAmount;
 		chessFactory = _chessFactory;
+		owner = _chessFactory;
 
 		gameActive = false;
 		status = GameStatus.Inactive;
@@ -98,7 +103,6 @@ contract ChessTemplate is ChessControl {
 	}
 
 	function _finalizeGame(uint16 outcome) internal {
-
 		gameActive = false;
 		status = GameStatus.Ended;
 		address winner;
@@ -143,6 +147,48 @@ contract ChessTemplate is ChessControl {
 				winner,
 				platformFee,
 				winnerReward
+			)
+		);
+		require(success, "Failed to distribute rewards");
+	}
+
+	function proposeDraw() external onlyPlayers {
+		require(gameActive, "Game is inactive");
+		require(!drawProposed, "Draw already proposed");
+		require(msg.sender == player1 || msg.sender == player2, "Only players can propose");
+		require(status == GameStatus.Active, "Game is not active"); // Vérifie que le jeu est en cours
+
+		drawProposed = true;
+		proposer = msg.sender;
+
+		emit DrawProposed(msg.sender);
+	}
+
+	function acceptDraw() external onlyPlayers {
+		require(gameActive, "Game is inactive");
+		require(chessFactory != address(0), "ChessFactory address not set");
+		require(msg.sender != proposer, "Proposer cannot accept their own draw");
+		require(player1 != address(0) && player2 != address(0), "Invalid players");
+		require(msg.sender == player1 || msg.sender == player2, "Only players can accept the draw");
+
+		gameActive = false;
+		status = GameStatus.Draw;
+
+		emit DrawAccepted(proposer, msg.sender);
+
+		uint256 totalPot = betAmount * 2;
+		uint256 platformFee = (totalPot * 25) / 100;
+		uint256 share = (totalPot - platformFee) / 2;
+
+		// Appel bas niveau similaire à abandon
+		(bool success, ) = chessFactory.call(
+			abi.encodeWithSignature(
+				"distributeRewards(address,address,address,uint256,uint256)",
+				player1,
+				player2,
+				address(0),
+				platformFee,
+				share
 			)
 		);
 		require(success, "Failed to distribute rewards");

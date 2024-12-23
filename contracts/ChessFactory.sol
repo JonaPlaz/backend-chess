@@ -48,6 +48,8 @@ contract ChessFactory is Ownable {
 	event GameStarted(address indexed gameAddress, address player1, address player2, uint256 betAmount, uint256 startTime);
 	event UserRegistered(address indexed user, string pseudo, uint256 initialBalance);
 	event GameEnded(address indexed gameAddress, address winner, uint256 winnerReward, uint256 platformFee);
+	event RewardsDistributed(address indexed player1, address indexed player2, address indexed winner, uint256 platformFee, uint256 reward);
+	event ChessTokensPurchased(address indexed buyer, uint256 ethSpent, uint256 chessBought);
 
 	constructor(address _templateAddress) Ownable(msg.sender) {
 		templateAddress = _templateAddress;
@@ -157,14 +159,20 @@ contract ChessFactory is Ownable {
 		emit GameStarted(gameAddress, game.player1.userAddress, game.player2.userAddress, game.betAmount, block.timestamp);
 	}
 
-	function distributeRewards(address player1, address player2, address winner, uint256 platformFee, uint256 winnerReward) external {
+	function distributeRewards(address player1, address player2, address winner, uint256 platformFee, uint256 reward) external {
 		require(msg.sender != address(0), "Invalid caller");
 		require(platformBalance >= platformFee, "Insufficient platform balance");
 
 		platformBalance += platformFee;
-		if (winner == player1 || winner == player2) {
-			users[winner].balance += winnerReward;
+
+		if (winner == address(0)) {
+			users[player1].balance += reward;
+			users[player2].balance += reward;
+		} else {
+			users[winner].balance += reward;
 		}
+
+		emit RewardsDistributed(player1, player2, winner, platformFee, reward);
 	}
 
 	function getAllGameDetails() external view returns (Game[] memory) {
