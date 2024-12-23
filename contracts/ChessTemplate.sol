@@ -2,7 +2,11 @@
 pragma solidity 0.8.27;
 
 import "./ChessControl.sol";
+import "./ChessFactory.sol";
 
+// si partie gagnée, abandon ou draw gameActive = false mais impossible de le repaser à true !! SECURITE trop facile d'utiliser setGameActive
+// ajouter fonction abandon si joueur ne joue pas dans les temps : temps à définir
+// déterminer le montant des récompenses ici
 contract ChessTemplate is ChessControl {
 	address public player1;
 	address public player2;
@@ -10,9 +14,22 @@ contract ChessTemplate is ChessControl {
 	bool public gameActive = false;
 	uint16[] private storedMoves;
 	uint8 private currentOutcome;
+	address private owner;
+	address public chessFactory;
+	address public abandoner;
+
+	enum GameStatus {
+		Inactive,
+		Active,
+		Draw,
+		Abandoned,
+		Ended
+	}
+	GameStatus public status;
 
 	event GameStarted(address player1, address player2, uint256 betAmount);
 	event MovePlayed(address player, uint16 move);
+	event GameAbandoned(address loser, address winner);
 	event GameEnded(uint16 outcome, address winner);
 
 	error AlreadyInitialized();
@@ -27,14 +44,17 @@ contract ChessTemplate is ChessControl {
 	}
 
 	/// @notice Initializes the cloned contract
-	function initialize(address _player1, address _player2, uint256 _betAmount) external {
-		require(player1 == address(0) && player2 == address(0), "Already initialized");
+	function initialize(address _player1, address _player2, uint256 _betAmount, address _chessFactory) external {
+		require(chessFactory == address(0), "Already initialized");
 
 		player1 = _player1;
 		player2 = _player2;
 		betAmount = _betAmount;
+		chessFactory = _chessFactory;
 
-		gameActive = false; // La partie est inactive par défaut
+		gameActive = false;
+		status = GameStatus.Inactive;
+
 		emit GameStarted(player1, player2, betAmount);
 	}
 
@@ -42,13 +62,11 @@ contract ChessTemplate is ChessControl {
 		return gameActive;
 	}
 
-	/// @notice Sets Player 1's address
 	function setPlayer1(address _player1) external {
 		require(player1 == address(0), "Player 1 already assigned");
 		player1 = _player1;
 	}
 
-	/// @notice Sets Player 2's address
 	function setPlayer2(address _player2) external {
 		require(player2 == address(0), "Player 2 already assigned");
 		player2 = _player2;
@@ -59,35 +77,29 @@ contract ChessTemplate is ChessControl {
 		require(!gameActive, "Game is already active");
 
 		gameActive = true;
+		status = GameStatus.Active;
 	}
 
-	/// @notice Validates and plays moves in sequence
-	/// @param moves The list of moves played so far
 	function playMove(uint16[] memory moves) external onlyPlayers {
 		require(gameActive, "Game is inactive");
 		require(moves.length > 0, "Moves array is empty");
 
-		// Validation de la partie entière via checkGameFromStart
 		(uint8 outcome, , , ) = checkGameFromStart(moves);
 
-		// Mise à jour des moves et de l'outcome
 		storedMoves = moves;
 		currentOutcome = outcome;
 
-		// Envoie un event pour indiquer le dernier coup joué
 		emit MovePlayed(msg.sender, moves[moves.length - 1]);
 
-		// Fin de partie si un résultat a été trouvé
-		// ajouter un ou des évenement pour fin de partie à récupérer dans le front
 		if (outcome != inconclusive_outcome) {
 			_finalizeGame(outcome);
 		}
 	}
 
-	/// @notice Finalizes the game and distributes the rewards
-	/// @param outcome The result of the game
 	function _finalizeGame(uint16 outcome) internal {
+
 		gameActive = false;
+		status = GameStatus.Ended;
 		address winner;
 
 		if (outcome == white_win_outcome) {
@@ -99,20 +111,62 @@ contract ChessTemplate is ChessControl {
 		emit GameEnded(outcome, winner);
 
 		if (winner != address(0)) {
-			// Victoire : le gagnant reçoit tout
-			payable(winner).transfer(betAmount * 2);
-		} else if (outcome == draw_outcome) {
-			// Égalité : chaque joueur récupère sa mise
-			payable(player1).transfer(betAmount);
-			payable(player2).transfer(betAmount);
+			uint256 totalPot = betAmount * 2;
+			uint256 platformFee = (totalPot * 10) / 100;
+			uint256 winnerReward = totalPot - platformFee;
+
+			ChessFactory(owner).distributeRewards(player1, player2, winner, platformFee, winnerReward);
 		}
 	}
 
-	/// @notice Returns the current game state
-	/// @return moves List of moves played so far
-	/// @return outcome Current outcome of the game
-	function getGameState() external view returns (uint16[] memory moves, uint8 outcome) {
+	function abandon() external onlyPlayers {
+		require(gameActive, "Game is inactive");
+		require(chessFactory != address(0), "ChessFactory address not set");
+
+		gameActive = false;
+		status = GameStatus.Abandoned;
+		abandoner = msg.sender; // Enregistre le joueur qui a abandonné
+		address winner = msg.sender == player1 ? player2 : player1;
+
+		emit GameAbandoned(msg.sender, winner);
+
+		uint256 totalPot = betAmount * 2;
+		uint256 platformFee = (totalPot * 10) / 100;
+		uint256 winnerReward = totalPot - platformFee;
+
+		(bool success, ) = chessFactory.call(
+			abi.encodeWithSignature(
+				"distributeRewards(address,address,address,uint256,uint256)",
+				player1,
+				player2,
+				winner,
+				platformFee,
+				winnerReward
+			)
+		);
+		require(success, "Failed to distribute rewards");
+	}
+
+	function getGameState()
+		external
+		view
+		returns (uint16[] memory moves, uint8 outcome, GameStatus currentStatus, address winner, address loser)
+	{
 		moves = storedMoves;
 		outcome = currentOutcome;
+		currentStatus = status;
+		winner = (status == GameStatus.Ended || status == GameStatus.Abandoned) ? _getWinner() : address(0);
+		loser = (status == GameStatus.Abandoned) ? abandoner : address(0); // Identifie le perdant si abandon
+	}
+
+	function _getWinner() internal view returns (address) {
+		if (currentOutcome == white_win_outcome) {
+			return player1;
+		} else if (currentOutcome == black_win_outcome) {
+			return player2;
+		} else if (status == GameStatus.Abandoned) {
+			return abandoner == player1 ? player2 : player1;
+		}
+		return address(0);
 	}
 }

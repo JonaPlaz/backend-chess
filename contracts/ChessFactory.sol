@@ -6,6 +6,8 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
 import "./ChessTemplate.sol";
 
+// ajouter withdrawTokens pour récupérer les tokens du contrat
+// utiliser call et non transfer pour les tokens
 contract ChessFactory is Ownable {
 	address public templateAddress;
 	address public chessTokenAddress;
@@ -15,7 +17,7 @@ contract ChessFactory is Ownable {
 	struct User {
 		address userAddress;
 		string pseudo;
-		uint256 balance; // Balance des tokens sur la plateforme
+		uint256 balance;
 	}
 
 	struct Game {
@@ -23,7 +25,7 @@ contract ChessFactory is Ownable {
 		User player1;
 		User player2;
 		uint256 betAmount;
-		uint256 startTime; // Heure de début de la partie (timestamp Unix)
+		uint256 startTime;
 	}
 
 	mapping(address => User) public users;
@@ -85,8 +87,13 @@ contract ChessFactory is Ownable {
 
 		address clone = Clones.clone(templateAddress);
 
-		// Initialise avec gameActive = false
-		ChessTemplate(clone).initialize(address(0), address(0), betAmount);
+		// Passez l'adresse du ChessFactory au clone lors de l'initialisation
+		ChessTemplate(clone).initialize(
+			address(0), // Player 1
+			address(0), // Player 2
+			betAmount, // Montant du pari
+			address(this) // Adresse du ChessFactory
+		);
 
 		games.push(clone);
 
@@ -118,7 +125,6 @@ contract ChessFactory is Ownable {
 			game.player2 = user;
 			ChessTemplate(game.gameAddress).setPlayer2(user.userAddress);
 
-			// Active la partie après l'enregistrement des deux joueurs
 			ChessTemplate(game.gameAddress).setGameActive();
 		}
 
@@ -139,6 +145,16 @@ contract ChessFactory is Ownable {
 		require(block.timestamp >= game.startTime, "Game start time not reached");
 
 		emit GameStarted(gameAddress, game.player1.userAddress, game.player2.userAddress, game.betAmount, block.timestamp);
+	}
+
+	function distributeRewards(address player1, address player2, address winner, uint256 platformFee, uint256 winnerReward) external {
+		require(msg.sender != address(0), "Invalid caller");
+		require(platformBalance >= platformFee, "Insufficient platform balance");
+
+		platformBalance += platformFee;
+		if (winner == player1 || winner == player2) {
+			users[winner].balance += winnerReward;
+		}
 	}
 
 	function getAllGameDetails() external view returns (Game[] memory) {
