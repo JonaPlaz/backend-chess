@@ -112,7 +112,7 @@ contract ChessTemplate is ChessControl {
 
 		if (winner != address(0)) {
 			uint256 totalPot = betAmount * 2;
-			uint256 platformFee = (totalPot * 10) / 100;
+			uint256 platformFee = (totalPot * 25) / 100;
 			uint256 winnerReward = totalPot - platformFee;
 
 			ChessFactory(owner).distributeRewards(player1, player2, winner, platformFee, winnerReward);
@@ -131,7 +131,7 @@ contract ChessTemplate is ChessControl {
 		emit GameAbandoned(msg.sender, winner);
 
 		uint256 totalPot = betAmount * 2;
-		uint256 platformFee = (totalPot * 10) / 100;
+		uint256 platformFee = (totalPot * 25) / 100;
 		uint256 winnerReward = totalPot - platformFee;
 
 		(bool success, ) = chessFactory.call(
