@@ -57,13 +57,13 @@ contract ChessFactory is Ownable {
 		require(users[msg.sender].userAddress == address(0), "User already registered");
 		require(bytes(pseudo).length > 0, "Pseudo cannot be empty");
 
-		require(platformBalance >= 100 * 10 ** 18, "Insufficient platform balance");
+		require(platformBalance >= 1000 * 10 ** 18, "Insufficient platform balance");
 
-		users[msg.sender] = User({userAddress: msg.sender, pseudo: pseudo, balance: 100 * 10 ** 18});
+		users[msg.sender] = User({userAddress: msg.sender, pseudo: pseudo, balance: 1000 * 10 ** 18});
 
-		platformBalance -= 100 * 10 ** 18;
+		platformBalance -= 1000 * 10 ** 18;
 		userAddresses.push(msg.sender);
-		emit UserRegistered(msg.sender, pseudo, 100 * 10 ** 18);
+		emit UserRegistered(msg.sender, pseudo, 1000 * 10 ** 18);
 	}
 
 	function getAllUsers() public view returns (User[] memory) {
