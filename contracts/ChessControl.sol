@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.27;
 
+// require(!checkForCheck(gameState, opponentState), "Invalid check state");
+// corriger bug sur invalid check state
+
 contract ChessControl {
 	uint8 constant empty_const = 0x0;
 	uint8 constant pawn_const = 0x1; // 001
@@ -73,7 +76,7 @@ contract ChessControl {
 	constructor() {}
 
 	function checkGameFromStart(uint16[] memory moves) public pure returns (uint8, uint256, uint32, uint32) {
-		require(moves.length > 0, "Moves array cannot be empty"); // Validation ajoutée
+		require(moves.length > 0, "Moves array cannot be empty");
 		return checkGame(game_state_start, initial_white_state, initial_black_state, false, moves);
 	}
 
@@ -871,6 +874,7 @@ contract ChessControl {
 	}
 
 	function pieceUnderAttack(uint256 gameState, uint8 pos) public pure returns (bool) {
+		// Récupère la pièce occupant `pos` pour déterminer sa couleur
 		uint8 currPiece = uint8(gameState >> (pos * piece_bit_size)) & 0xF;
 
 		uint8 enemyPawn = pawn_const | ((currPiece & color_const) > 0 ? 0x0 : color_const);
@@ -880,11 +884,58 @@ contract ChessControl {
 		uint8 enemyQueen = queen_const | ((currPiece & color_const) > 0 ? 0x0 : color_const);
 		uint8 enemyKing = king_const | ((currPiece & color_const) > 0 ? 0x0 : color_const);
 
-		// Check all directions: vertical, horizontal, diagonal, and knight moves
-		return
-			checkDirectionalAttack(gameState, pos, enemyRook, enemyQueen, enemyKing) ||
+		// 1) Attaques Tour, Fou, Dame, Cavalier, etc.
+		bool attacked = checkDirectionalAttack(gameState, pos, enemyRook, enemyQueen, enemyKing) ||
 			checkDiagonalAttack(gameState, pos, enemyBishop, enemyQueen, enemyKing, enemyPawn) ||
 			checkKnightAttack(gameState, pos, enemyKnight);
+
+		// 2) Vérifier si le roi adverse est à une case
+		if (!attacked) {
+			bool nearKing = isKingAdjacent(gameState, pos, (currPiece & color_const) > 0);
+			if (nearKing) {
+				return true;
+			}
+			return false;
+		}
+
+		return attacked;
+	}
+
+	/**
+	 * @dev Vérifie si un roi adverse se trouve à une case de `pos`.
+	 *      On scanne le board pour trouver un roi de couleur opposée.
+	 */
+	function isKingAdjacent(uint256 gameState, uint8 pos, bool isPosBlack) internal pure returns (bool) {
+		// Couleur ennemie = on inverse le bit color_const
+		// (si isPosBlack=true => l'adversaire est blanc => piece = type + 0x0)
+		// (si isPosBlack=false => l'adversaire est noir => piece = type + 0x8)
+		uint8 enemyKingPiece = isPosBlack ? king_const /*=0x6*/ : (king_const | color_const) /*=0xe*/;
+
+		// Décoder la ligne/col de la case pos
+		uint8 rowPos = pos >> 3; // rang (0..7)
+		uint8 colPos = pos & 0x07; // colonne (0..7)
+
+		// Parcourt toutes les cases du board pour trouver le roi adverse
+		// (pour un code + rapide, tu pourrais directement utiliser l'info king_pos dans playerState/opponentState,
+		//  mais on reste simple ici).
+		for (uint8 sq = 0; sq < 64; sq++) {
+			uint8 piece = uint8((gameState >> (sq * piece_bit_size)) & 0xF);
+			if (piece == enemyKingPiece) {
+				// C'est bien un roi adverse
+				uint8 rowKing = sq >> 3;
+				uint8 colKing = sq & 0x07;
+
+				// Est-il à distance <= 1 ?
+				if (
+					(rowKing > rowPos ? (rowKing - rowPos) : (rowPos - rowKing)) <= 1 &&
+					(colKing > colPos ? (colKing - colPos) : (colPos - colKing)) <= 1
+				) {
+					// Oui -> roi adverse adjacent => pos est “sous le contrôle” de ce roi
+					return true;
+				}
+			}
+		}
+		return false;
 	}
 
 	function checkDirectionalAttack(
@@ -924,33 +975,49 @@ contract ChessControl {
 		uint8 enemyKing,
 		uint8 enemyPawn
 	) internal pure returns (bool) {
-		int8[4] memory directions = [int8(9), int8(7), int8(-7), int8(-9)]; // UpRight, UpLeft, DownRight, DownLeft
+		// Directions classiques pour fou/diagonale : +9, +7, -7, -9
+		int8[4] memory directions = [int8(9), int8(7), int8(-7), int8(-9)];
+
 		for (uint8 i = 0; i < directions.length; i++) {
 			bool firstSq = true;
 			int8 currPos = int8(pos);
+
 			while (true) {
+				// Avancer d'un "pas" diagonal
 				currPos += directions[i];
-				if (
-					currPos < 0 || currPos >= 64 || ((directions[i] == 9 || directions[i] == -9) && ((uint8(currPos) & 0x7) != (pos & 0x7)))
-				) {
+
+				// Si on sort du board, on arrête
+				if (currPos < 0 || currPos >= 64) {
 					break;
 				}
-				uint8 currPiece = uint8(gameState >> (uint8(currPos) * piece_bit_size)) & 0xF;
-				if (currPiece > 0) {
+
+				// Lire la pièce à la position currPos
+				uint8 foundPiece = uint8(gameState >> (uint8(currPos) * piece_bit_size)) & 0xF;
+
+				// Si on tombe sur une pièce
+				if (foundPiece > 0) {
+					// Vérifier si c'est un fou ennemi, une dame ennemie
+					// ou (uniquement si firstSq=true) un roi ennemi ou un pion ennemi
+					// (pour certains calculs d'attaque diagonale comme la prise en passant du pion, etc.)
 					if (
-						currPiece == enemyBishop ||
-						currPiece == enemyQueen ||
+						foundPiece == enemyBishop ||
+						foundPiece == enemyQueen ||
 						(firstSq &&
-							(currPiece == enemyKing ||
-								(currPiece == enemyPawn && ((enemyPawn & color_const) == (currPiece & color_const)))))
+							(foundPiece == enemyKing ||
+								(foundPiece == enemyPawn && ((enemyPawn & color_const) == (foundPiece & color_const)))))
 					) {
 						return true;
 					}
+					// Sinon, c'est une autre pièce (ou pas le bon type), on bloque la diagonale
 					break;
 				}
+
+				// Pas de pièce rencontrée, on poursuit la diagonale
 				firstSq = false;
 			}
 		}
+
+		// Si on n'a jamais trouvé de pièce correspondant à un fou/dame/roi/pion (en 1ère case), c'est false
 		return false;
 	}
 
