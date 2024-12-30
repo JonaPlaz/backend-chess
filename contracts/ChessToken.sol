@@ -9,12 +9,14 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 /**
  * @title ChessToken
  * @dev ERC20 token with minting and burning capabilities, restricted by an external ChessFactory contract.
- *      This contract is owned by the deployer and uses OpenZeppelin libraries for security and modularity.
  */
 contract ChessToken is ERC20, Ownable, ReentrancyGuard {
 	using SafeERC20 for IERC20;
 
-	/// Custom errors for efficient error handling
+	// -------------------------------------------------------------
+	// Custom Errors
+	// -------------------------------------------------------------
+
 	error InvalidAddress();
 	error OnlyChessFactoryCanMint();
 	error InvalidRecipientAddress();

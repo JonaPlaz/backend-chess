@@ -18,16 +18,16 @@ interface IChessTemplate {
 	function isGameActive() external view returns (bool);
 }
 
-/// @custom:security-contact your-email@example.com
 contract ChessFactory is Ownable, ReentrancyGuard {
 	/* ========== STATE VARIABLES ========== */
 
 	address public immutable templateAddress;
 	address public chessTokenAddress;
-	uint256 public platformBalance;
 
-	address[] public games;
 	address[] public userAddresses;
+	address[] public games;
+
+	uint256 public platformBalance;
 
 	/* ========== STRUCTS ========== */
 
@@ -83,6 +83,7 @@ contract ChessFactory is Ownable, ReentrancyGuard {
 	error InsufficientContractBalance();
 	error EtherTransferFailed();
 	error StartIndexOutOfBounds();
+	error NotParticipant();
 
 	/* ========== MODIFIERS ========== */
 
@@ -93,9 +94,17 @@ contract ChessFactory is Ownable, ReentrancyGuard {
 		_;
 	}
 
-	modifier userRegistered(address user) {
+	modifier onlyUser(address user) {
 		if (users[user].userAddress == address(0)) {
 			revert UserNotRegistered();
+		}
+		_;
+	}
+
+	modifier onlyPlayer(address gameAddress) {
+		Game storage game = gameDetails[gameAddress];
+		if (msg.sender != game.player1.userAddress && msg.sender != game.player2.userAddress) {
+			revert NotParticipant();
 		}
 		_;
 	}
@@ -144,7 +153,7 @@ contract ChessFactory is Ownable, ReentrancyGuard {
 	/// @notice Creates a new chess game with a specified bet amount and start time.
 	/// @param betAmount The amount of Chess tokens to bet for the game.
 	/// @param startTime The scheduled start time for the game.
-	function createGame(uint256 betAmount, uint256 startTime) external onlyOwner nonReentrant {
+	function createGame(uint256 betAmount, uint256 startTime) external onlyOwner {
 		if (betAmount == 0) {
 			revert InvalidBetAmount();
 		}
@@ -155,10 +164,7 @@ contract ChessFactory is Ownable, ReentrancyGuard {
 			revert InvalidTemplateAddress();
 		}
 
-		// Create a clone of the game template
 		address clone = Clones.clone(templateAddress);
-
-		// Initialize the game with no players
 		IChessTemplate(clone).initialize(address(0), address(0), address(this));
 
 		// Add game details
@@ -227,7 +233,6 @@ contract ChessFactory is Ownable, ReentrancyGuard {
 		// Update the platform balance
 		platformBalance -= amount;
 
-		// Transfer tokens using call
 		(bool success, bytes memory data) = address(chessToken).call(abi.encodeWithSelector(IERC20.transfer.selector, msg.sender, amount));
 
 		if (!success || (data.length > 0 && !abi.decode(data, (bool)))) {
@@ -292,7 +297,6 @@ contract ChessFactory is Ownable, ReentrancyGuard {
 
 		uint256 amountToBuy = (amountInEth * 1e18) / 0.000001 ether;
 
-		// Ensure the platform has enough Chess tokens to sell
 		if (platformBalance < amountToBuy) {
 			revert InsufficientPlatformBalance();
 		}
@@ -308,7 +312,7 @@ contract ChessFactory is Ownable, ReentrancyGuard {
 
 	/// @notice Registers the caller to a specific game.
 	/// @param gameAddress The address of the game to join.
-	function registerToGame(address gameAddress) external gameExists(gameAddress) userRegistered(msg.sender) {
+	function registerToGame(address gameAddress) external gameExists(gameAddress) onlyUser(msg.sender) {
 		Game storage game = gameDetails[gameAddress];
 		User storage user = users[msg.sender];
 
@@ -343,13 +347,10 @@ contract ChessFactory is Ownable, ReentrancyGuard {
 
 	/// @notice Starts a game once both players have joined and the start time has been reached.
 	/// @param gameAddress The address of the game to start.
-	function joinGame(address gameAddress) external nonReentrant gameExists(gameAddress) {
+	function joinGame(address gameAddress) external nonReentrant gameExists(gameAddress) onlyPlayer(gameAddress) {
 		Game storage game = gameDetails[gameAddress];
-		if (game.player1.userAddress == address(0) || game.player2.userAddress == address(0)) {
-			revert UserNotRegistered();
-		}
 		if (!IChessTemplate(gameAddress).isGameActive()) {
-			revert InvalidChessTokenAddress(); // Reusing existing error; consider creating a specific error
+			revert InvalidChessTokenAddress();
 		}
 		if (block.timestamp < game.startTime) {
 			revert StartTimeInPast();
@@ -413,7 +414,7 @@ contract ChessFactory is Ownable, ReentrancyGuard {
 
 	/// @notice Retrieves the caller's user details.
 	/// @return user The User struct of the caller.
-	function getUser() external view userRegistered(msg.sender) returns (User memory user) {
+	function getUser() external view onlyUser(msg.sender) returns (User memory user) {
 		user = users[msg.sender];
 	}
 

@@ -7,6 +7,14 @@ import "./ChessControl.sol";
 import "./ChessFactory.sol";
 
 /**
+ * @title IChessFactory
+ * @dev Interface for the ChessFactory contract to interact with ChessTemplate.
+ */
+interface IChessFactory {
+	function distributeRewards(address player1, address player2, address winner, uint256 platformFee, uint256 reward) external;
+}
+
+/**
  * @title ChessTemplate
  * @dev A decentralized chess game contract that manages game state, player interactions, and reward distributions.
  * Inherits from ChessControl, ReentrancyGuard, and Ownable for extended functionalities and security.
@@ -16,127 +24,73 @@ contract ChessTemplate is ChessControl, ReentrancyGuard, Ownable {
 	// ============ STATE ============
 	// ==============================
 
-	/// @notice Address of the first player.
+	IChessFactory public chessFactory;
+
 	address public player1;
-
-	/// @notice Address of the second player.
 	address public player2;
-
-	/// @notice Fixed bet amount per player in chessToken (assuming 18 decimals).
-	uint256 public constant BET_AMOUNT = 1000 * 10 ** 18;
-
-	/// @notice Indicates whether the game is currently active.
-	bool public gameActive = false;
-
-	/// @notice Array storing all moves made in the game.
-	uint16[] private storedMoves;
-
-	/// @notice Current outcome of the game.
-	uint8 private currentOutcome;
-
-	/// @notice Address of the ChessFactory contract managing game creation and reward distribution.
-	address payable public chessFactory;
-
-	/// @notice Address of the player who has abandoned the game, if any.
 	address public abandoner;
-
-	/// @notice Indicates whether a draw has been proposed.
-	bool public drawProposed;
-
-	/// @notice Address of the player who proposed a draw.
 	address public proposer;
 
-	/// @notice Timestamp of the last move made in the game.
+	bool public gameActive;
+	bool public drawProposed;
+
+	uint8 private currentOutcome;
+
 	uint256 public lastMoveTime;
-
-	/// @notice Fixed timeout period for moves (15 minutes).
-	uint256 public constant MOVE_TIMEOUT = 15 minutes;
-
-	/// @notice Counter for the number of moves made in the game.
 	uint256 public moveCount;
 
-	/// @notice Fixed reward for the winner in chessToken.
-	uint256 public constant WINNER_REWARD = 1500 * 10 ** 18;
+	uint16[] private storedMoves;
 
-	/// @notice Fixed platform fee in chessToken.
+	uint256 public constant BET_AMOUNT = 1000 * 10 ** 18;
 	uint256 public constant PLATFORM_FEE = 500 * 10 ** 18;
-
-	/// @notice Fixed reward per player in case of a draw in chessToken.
+	uint256 public constant WINNER_REWARD = 1500 * 10 ** 18;
 	uint256 public constant DRAW_REWARD = 750 * 10 ** 18;
+	uint256 public constant MOVE_TIMEOUT = 15 minutes;
 
-	/**
-	 * @dev Enum representing the various statuses of a game.
-	 */
+	// ===============================
+	// ============ STATUS ============
+	// ===============================
+
 	enum GameStatus {
-		Inactive, // Game has not started yet.
-		Active, // Game is currently active.
-		Draw, // Game ended in a draw.
-		Abandoned, // Game was abandoned by a player.
-		Ended // Game has concluded with a winner.
+		Inactive,
+		Active,
+		Draw,
+		Abandoned,
+		Ended
 	}
 
-	/// @notice Current status of the game.
 	GameStatus public status;
 
 	// ===============================
 	// ============ EVENTS ============
 	// ===============================
 
-	/// @notice Emitted when a new game is started.
-	/// @param player1 Address of the first player.
-	/// @param player2 Address of the second player.
-	/// @param betAmount Fixed bet amount per player.
 	event GameStarted(address indexed player1, address indexed player2, uint256 betAmount);
-
-	/// @notice Emitted when a player makes a move.
-	/// @param player Address of the player making the move.
-	/// @param move The move made by the player.
 	event MovePlayed(address indexed player, uint16 move);
-
-	/// @notice Emitted when a player proposes a draw.
-	/// @param proposer Address of the player proposing the draw.
 	event DrawProposed(address indexed proposer);
-
-	/// @notice Emitted when a player accepts a proposed draw.
-	/// @param proposer Address of the player who proposed the draw.
-	/// @param accepter Address of the player who accepted the draw.
 	event DrawAccepted(address indexed proposer, address indexed accepter);
-
-	/// @notice Emitted when a player abandons the game.
-	/// @param loser Address of the player who abandoned.
-	/// @param winner Address of the player who wins by abandonment.
 	event GameAbandoned(address indexed loser, address indexed winner);
-
-	/// @notice Emitted when the game ends with a winner.
-	/// @param outcome Result of the game determining the winner.
-	/// @param winner Address of the winner.
 	event GameEnded(uint16 outcome, address indexed winner);
-
-	/// @notice Emitted when the game ends due to a timeout, declaring a winner.
-	/// @param winner Address of the player who wins by timeout.
-	/// @param loser Address of the player who loses by timeout.
 	event GameEndedForTimeout(address indexed winner, address indexed loser);
-
-	/// @notice Emitted when the owner forces a draw due to a timeout.
-	/// @param player1 Address of the first player.
-	/// @param player2 Address of the second player.
 	event GameForcedDraw(address indexed player1, address indexed player2);
 
 	// ================================
 	// ============ ERRORS ============
 	// ================================
 
-	/// @notice Error thrown when attempting to initialize an already initialized contract.
 	error AlreadyInitialized();
-
-	/// @notice Error thrown when a non-participant attempts to perform a restricted action.
 	error NotParticipant();
-
-	/// @notice Error thrown when attempting to perform an action on an inactive game.
 	error GameNotActive();
-
-	/// @notice Error thrown when a player attempts to make a move out of turn.
 	error NotYourTurn();
+	error InvalidChessFactory();
+	error PlayersNotRegistered();
+	error GameAlreadyActive();
+	error EmptyMovesArray();
+	error DrawAlreadyProposed();
+	error ProposerCannotAccept();
+	error TimeoutNotPassed();
+	error OnlyChessFactory();
+	error InvalidPlayers();
 
 	// ===============================
 	// ========== MODIFIERS ==========
@@ -146,8 +100,16 @@ contract ChessTemplate is ChessControl, ReentrancyGuard, Ownable {
 	 * @dev Restricts function access to only the registered players of the game.
 	 */
 	modifier onlyPlayers() {
-		require(player1 != address(0) && player2 != address(0), "Players not registered");
-		require(msg.sender == player1 || msg.sender == player2, "Not a participant");
+		if (player1 == address(0) || player2 == address(0)) revert PlayersNotRegistered();
+		if (msg.sender != player1 && msg.sender != player2) revert NotParticipant();
+		_;
+	}
+
+	/**
+	 * @dev Restricts function access to only the ChessFactory contract.
+	 */
+	modifier onlyChessFactory() {
+		if (msg.sender != address(chessFactory)) revert OnlyChessFactory();
 		_;
 	}
 
@@ -155,9 +117,6 @@ contract ChessTemplate is ChessControl, ReentrancyGuard, Ownable {
 	// =========== CONSTRUCTOR ========
 	// ===============================
 
-	/**
-	 * @notice Constructor that initializes the Ownable contract with the deployer as the owner.
-	 */
 	constructor() Ownable(msg.sender) {}
 
 	// ===============================
@@ -170,21 +129,13 @@ contract ChessTemplate is ChessControl, ReentrancyGuard, Ownable {
 	 * @param _player1 Address of the first player.
 	 * @param _player2 Address of the second player.
 	 * @param _chessFactory Address of the ChessFactory contract.
-	 *
-	 * Requirements:
-	 * - The contract must not have been initialized before.
-	 * - Player addresses and ChessFactory address must not be zero.
-	 *
-	 * Emits a {GameStarted} event.
 	 */
 	function initialize(address _player1, address _player2, address _chessFactory) external {
-		if (chessFactory != address(0)) revert AlreadyInitialized();
-		require(_chessFactory != address(0), "Invalid ChessFactory address");
+		if (_chessFactory == address(0)) revert InvalidChessFactory();
 
-		// Initialisation des joueurs à address(0) si non spécifiés
+		chessFactory = IChessFactory(_chessFactory);
 		player1 = _player1;
 		player2 = _player2;
-		chessFactory = payable(_chessFactory);
 
 		gameActive = false;
 		status = GameStatus.Inactive;
@@ -205,12 +156,10 @@ contract ChessTemplate is ChessControl, ReentrancyGuard, Ownable {
 	 * @notice Sets the address of player1.
 	 * @dev Can only be called by the ChessFactory contract.
 	 * @param _player1 Address of the first player.
-	 *
-	 * Requirements:
-	 * - player1 must not have been set before.
 	 */
-	function setPlayer1(address _player1) external {
-		require(player1 == address(0), "Player 1 already assigned");
+	function setPlayer1(address _player1) external onlyChessFactory {
+		if (player1 != address(0)) revert AlreadyInitialized();
+		if (_player1 == address(0)) revert InvalidPlayers();
 		player1 = _player1;
 	}
 
@@ -218,58 +167,45 @@ contract ChessTemplate is ChessControl, ReentrancyGuard, Ownable {
 	 * @notice Sets the address of player2.
 	 * @dev Can only be called by the ChessFactory contract.
 	 * @param _player2 Address of the second player.
-	 *
-	 * Requirements:
-	 * - player2 must not have been set before.
 	 */
-	function setPlayer2(address _player2) external {
-		require(player2 == address(0), "Player 2 already assigned");
+	function setPlayer2(address _player2) external onlyChessFactory {
+		if (player2 != address(0)) revert AlreadyInitialized();
+		if (_player2 == address(0)) revert InvalidPlayers();
 		player2 = _player2;
 	}
 
 	/**
 	 * @notice Activates the game, allowing players to start making moves.
 	 * @dev Can only be called by the ChessFactory contract.
-	 *
-	 * Requirements:
-	 * - Both players must be registered.
-	 * - The game must not already be active.
-	 *
-	 * Emits no events.
 	 */
-	function setGameActive() external {
-		require(msg.sender == chessFactory, "Only ChessFactory can call this function");
-		require(player1 != address(0) && player2 != address(0), "Players not registered");
-		require(!gameActive, "Game is already active");
+	function setGameActive() external onlyChessFactory {
+		if (player1 == address(0) || player2 == address(0)) revert PlayersNotRegistered();
+		if (gameActive) revert GameAlreadyActive();
 
 		gameActive = true;
 		status = GameStatus.Active;
-		lastMoveTime = block.timestamp; // Initialize the timestamp
+		lastMoveTime = block.timestamp;
 	}
 
 	/**
 	 * @notice Allows players to make a move by submitting an array of moves.
 	 * @dev Only callable by registered players when the game is active.
 	 * @param moves An array of moves made by the player.
-	 *
-	 * Requirements:
-	 * - The game must be active.
-	 * - The moves array must not be empty.
-	 *
-	 * Emits a {MovePlayed} event and possibly a {GameEnded} event.
 	 */
-	function playMove(uint16[] memory moves) external onlyPlayers {
-		require(gameActive, "Game is inactive");
-		require(moves.length > 0, "Moves array is empty");
+	function playMove(uint16[] calldata moves) external onlyPlayers nonReentrant {
+		if (!gameActive) revert GameNotActive();
+		if (moves.length == 0) revert EmptyMovesArray();
 
 		(uint8 outcome, , , ) = checkGameFromStart(moves);
 
-		storedMoves = moves;
-		currentOutcome = outcome;
-		lastMoveTime = block.timestamp; // Update the timestamp
-		moveCount += 1; // Increment the move count
+		for (uint256 i = 0; i < moves.length; i++) {
+			storedMoves.push(moves[i]);
+			emit MovePlayed(msg.sender, moves[i]);
+		}
 
-		emit MovePlayed(msg.sender, moves[moves.length - 1]);
+		currentOutcome = outcome;
+		lastMoveTime = block.timestamp;
+		moveCount += moves.length;
 
 		if (outcome != inconclusive_outcome) {
 			_finalizeGame(outcome);
@@ -278,10 +214,8 @@ contract ChessTemplate is ChessControl, ReentrancyGuard, Ownable {
 
 	/**
 	 * @notice Finalizes the game and distributes rewards if there is a winner.
-	 * @dev Internal function that should follow the Checks-Effects-Interactions pattern.
-	 * @param outcome The result of the game determining the winner.
-	 *
-	 * Emits a {GameEnded} event.
+	 * @dev Internal function that follows the Checks-Effects-Interactions pattern.
+	 * @param outcome The result of the game determining the winner..
 	 */
 	function _finalizeGame(uint16 outcome) internal {
 		gameActive = false;
@@ -297,50 +231,34 @@ contract ChessTemplate is ChessControl, ReentrancyGuard, Ownable {
 		emit GameEnded(outcome, winner);
 
 		if (winner != address(0)) {
-			// Distribute fixed rewards
-			ChessFactory(chessFactory).distributeRewards(player1, player2, winner, PLATFORM_FEE, WINNER_REWARD);
+			chessFactory.distributeRewards(player1, player2, winner, PLATFORM_FEE, WINNER_REWARD);
 		}
 	}
 
 	/**
 	 * @notice Allows a player to abandon the game.
 	 * @dev Only callable by registered players when the game is active.
-	 *
-	 * Requirements:
-	 * - The game must be active.
-	 * - ChessFactory address must be set.
-	 *
-	 * Emits a {GameAbandoned} event.
 	 */
-	function abandon() external onlyPlayers {
-		require(gameActive, "Game is inactive");
+	function abandon() external onlyPlayers nonReentrant {
+		if (!gameActive) revert GameNotActive();
 
 		gameActive = false;
 		status = GameStatus.Abandoned;
-		abandoner = msg.sender; // Record the abandoning player
-		address winner = msg.sender == player1 ? player2 : player1;
+		abandoner = msg.sender;
+		address winner = (msg.sender == player1) ? player2 : player1;
 
 		emit GameAbandoned(msg.sender, winner);
 
-		// Distribute fixed rewards via ChessFactory
-		ChessFactory(chessFactory).distributeRewards(player1, player2, winner, PLATFORM_FEE, WINNER_REWARD);
+		chessFactory.distributeRewards(player1, player2, winner, PLATFORM_FEE, WINNER_REWARD);
 	}
 
 	/**
 	 * @notice Allows a player to propose a draw.
 	 * @dev Only callable by registered players when the game is active and no draw has been proposed yet.
-	 *
-	 * Requirements:
-	 * - The game must be active.
-	 * - No draw must have been proposed already.
-	 *
-	 * Emits a {DrawProposed} event.
 	 */
 	function proposeDraw() external onlyPlayers {
-		require(gameActive, "Game is inactive");
-		require(!drawProposed, "Draw already proposed");
-		require(msg.sender == player1 || msg.sender == player2, "Only players can propose");
-		require(status == GameStatus.Active, "Game is not active"); // Ensure the game is ongoing
+		if (!gameActive) revert GameNotActive();
+		if (drawProposed) revert DrawAlreadyProposed();
 
 		drawProposed = true;
 		proposer = msg.sender;
@@ -352,45 +270,29 @@ contract ChessTemplate is ChessControl, ReentrancyGuard, Ownable {
 	 * @notice Allows a player to accept a proposed draw.
 	 * @dev Only callable by registered players when the game is active and a draw has been proposed.
 	 * @dev The proposer cannot accept their own draw.
-	 *
-	 * Requirements:
-	 * - The game must be active.
-	 * - ChessFactory address must be set.
-	 * - The accepter cannot be the proposer.
-	 * - Both players must be valid and distinct.
-	 *
-	 * Emits a {DrawAccepted} event.
 	 */
-	function acceptDraw() external onlyPlayers {
-		require(gameActive, "Game is inactive");
-		require(msg.sender != proposer, "Proposer cannot accept their own draw");
-		require(player1 != address(0) && player2 != address(0), "Invalid players");
-		require(msg.sender == player1 || msg.sender == player2, "Only players can accept the draw");
+	function acceptDraw() external onlyPlayers nonReentrant {
+		if (!gameActive) revert GameNotActive();
+		if (msg.sender == proposer) revert ProposerCannotAccept();
+		if (player1 == address(0) || player2 == address(0)) revert InvalidPlayers();
+		if (msg.sender != player1 && msg.sender != player2) revert NotParticipant();
 
 		gameActive = false;
 		status = GameStatus.Draw;
 
 		emit DrawAccepted(proposer, msg.sender);
 
-		// Distribute fixed rewards in case of a draw
-		ChessFactory(chessFactory).distributeRewards(player1, player2, address(0), PLATFORM_FEE, DRAW_REWARD);
+		chessFactory.distributeRewards(player1, player2, address(0), PLATFORM_FEE, DRAW_REWARD);
 	}
 
 	/**
 	 * @notice Allows the owner to declare a winner if no move has been made within the timeout period.
 	 * @dev Only callable by the contract owner.
-	 *
-	 * Requirements:
-	 * - The game must be active.
-	 * - The timeout period must have passed since the last move.
-	 *
-	 * Emits a {GameEndedForTimeout} event.
 	 */
-	function forceWinDueToTimeout() external onlyOwner {
-		require(gameActive, "Game is not active");
-		require(block.timestamp >= lastMoveTime + MOVE_TIMEOUT, "Timeout period has not yet passed");
+	function forceWinDueToTimeout() external onlyOwner nonReentrant {
+		if (!gameActive) revert GameNotActive();
+		if (block.timestamp < lastMoveTime + MOVE_TIMEOUT) revert TimeoutNotPassed();
 
-		// Determine the loser based on the current turn
 		address loser = _getCurrentPlayerTurn();
 		address winner = (loser == player1) ? player2 : player1;
 
@@ -401,26 +303,18 @@ contract ChessTemplate is ChessControl, ReentrancyGuard, Ownable {
 	/**
 	 * @notice Allows the owner to force a draw if the opponent has not responded within the timeout period.
 	 * @dev Only callable by the contract owner.
-	 *
-	 * Requirements:
-	 * - The game must be active.
-	 * - The timeout period must have passed since the last move.
-	 *
-	 * Emits {GameForcedDraw} and {GameEndedForTimeout} events.
 	 */
-	function forceDrawDueToTimeout() external onlyOwner {
-		require(gameActive, "Game is not active");
-		require(block.timestamp >= lastMoveTime + MOVE_TIMEOUT, "Timeout period has not yet passed");
+	function forceDrawDueToTimeout() external onlyOwner nonReentrant {
+		if (!gameActive) revert GameNotActive();
+		if (block.timestamp < lastMoveTime + MOVE_TIMEOUT) revert TimeoutNotPassed();
 
-		// Finalize the game by declaring a draw
 		gameActive = false;
 		status = GameStatus.Draw;
 
 		emit GameForcedDraw(player1, player2);
 		emit GameEndedForTimeout(address(0), address(0));
 
-		// Distribute fixed rewards in case of a forced draw
-		ChessFactory(chessFactory).distributeRewards(player1, player2, address(0), PLATFORM_FEE, DRAW_REWARD);
+		chessFactory.distributeRewards(player1, player2, address(0), PLATFORM_FEE, DRAW_REWARD);
 	}
 
 	/**
@@ -442,8 +336,6 @@ contract ChessTemplate is ChessControl, ReentrancyGuard, Ownable {
 	 * @dev Internal function following the Checks-Effects-Interactions pattern.
 	 * @param winner Address of the player who wins by timeout.
 	 * @param loser Address of the player who loses by timeout.
-	 *
-	 * Emits a {GameEndedForTimeout} event.
 	 */
 	function _finalizeForcedWin(address winner, address loser) internal {
 		gameActive = false;
@@ -451,8 +343,7 @@ contract ChessTemplate is ChessControl, ReentrancyGuard, Ownable {
 
 		emit GameEndedForTimeout(winner, loser);
 
-		// Distribute fixed rewards
-		ChessFactory(chessFactory).distributeRewards(player1, player2, winner, PLATFORM_FEE, WINNER_REWARD);
+		chessFactory.distributeRewards(player1, player2, winner, PLATFORM_FEE, WINNER_REWARD);
 	}
 
 	/**
@@ -472,7 +363,7 @@ contract ChessTemplate is ChessControl, ReentrancyGuard, Ownable {
 		outcome = currentOutcome;
 		currentStatus = status;
 		winner = (status == GameStatus.Ended || status == GameStatus.Abandoned) ? _getWinner() : address(0);
-		loser = (status == GameStatus.Abandoned) ? abandoner : address(0); // Identify the loser if abandoned
+		loser = (status == GameStatus.Abandoned) ? abandoner : address(0);
 	}
 
 	/**
@@ -486,7 +377,7 @@ contract ChessTemplate is ChessControl, ReentrancyGuard, Ownable {
 		} else if (currentOutcome == black_win_outcome) {
 			return player2;
 		} else if (status == GameStatus.Abandoned) {
-			return abandoner == player1 ? player2 : player1;
+			return (abandoner == player1) ? player2 : player1;
 		}
 		return address(0);
 	}
