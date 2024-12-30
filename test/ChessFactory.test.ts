@@ -17,6 +17,7 @@ describe("ChessFactory", function () {
     const chessFactory = await hre.ethers.deployContract("ChessFactory", [
       chessTemplate.target,
     ]);
+
     await chessFactory.setChessToken(chessToken.target);
     const depositAmount = hre.ethers.parseUnits("100000", 18);
     await chessToken.approve(chessFactory.target, depositAmount);
@@ -33,12 +34,12 @@ describe("ChessFactory", function () {
     };
   }
 
-  // Helper function to register a user
+  // ====== HELPERS ====== //
+
   async function registerUser(chessFactory: any, user: any, pseudo = "Player") {
     await chessFactory.connect(user).registerUser(pseudo);
   }
 
-  // Helper function to create a game
   async function createGame(
     chessFactory,
     owner,
@@ -55,7 +56,6 @@ describe("ChessFactory", function () {
     return games[0].gameAddress;
   }
 
-  // Helper function to get game details
   async function getGameDetails(chessFactory: any, gameAddress: string) {
     return await chessFactory.getGameDetails(gameAddress);
   }
