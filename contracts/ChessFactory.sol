@@ -8,36 +8,35 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "./ChessTemplate.sol";
 
+// Interface for ChessTemplate to interact without importing the contract
+interface IChessTemplate {
+	function initialize(address _player1, address _player2, address _factory) external;
+	function setPlayer1(address _player1) external;
+	function setPlayer2(address _player2) external;
+	function setGameActive() external;
+	function isGameActive() external view returns (bool);
+}
+
+/// @custom:security-contact your-email@example.com
 contract ChessFactory is Ownable, ReentrancyGuard {
 	/* ========== STATE VARIABLES ========== */
 
-	/// @notice Address of the Chess game template contract.
-	address public templateAddress;
-
-	/// @notice Address of the Chess ERC20 token contract.
+	address public immutable templateAddress;
 	address public chessTokenAddress;
-
-	/// @notice Total balance held by the platform in Chess tokens.
 	uint256 public platformBalance;
 
-	/// @notice Array of all game addresses created by the factory.
 	address[] public games;
-
-	/// @notice Array of all registered user addresses.
 	address[] public userAddresses;
 
 	/* ========== STRUCTS ========== */
 
-	/// @notice Structure representing a user.
 	struct User {
 		address userAddress;
 		string pseudo;
 		uint256 balance;
 	}
 
-	/// @notice Structure representing a game.
 	struct Game {
 		address gameAddress;
 		User player1;
@@ -48,50 +47,67 @@ contract ChessFactory is Ownable, ReentrancyGuard {
 
 	/* ========== MAPPINGS ========== */
 
-	/// @notice Mapping from user address to User details.
 	mapping(address => User) public users;
-
-	/// @notice Mapping from player address to their current game address.
 	mapping(address => address) public playerToGame;
-
-	/// @notice Mapping from game address to Game details.
 	mapping(address => Game) public gameDetails;
 
 	/* ========== EVENTS ========== */
 
-	/// @notice Emitted when a new game is created.
 	event GameCreated(address indexed gameAddress, uint256 betAmount, uint256 startTime);
-
-	/// @notice Emitted when a player registers to a game.
 	event PlayerRegistered(address indexed gameAddress, address indexed player);
-
-	/// @notice Emitted when a game starts.
 	event GameStarted(address indexed gameAddress, address player1, address player2, uint256 betAmount, uint256 startTime);
-
-	/// @notice Emitted when a new user registers.
 	event UserRegistered(address indexed user, string pseudo, uint256 initialBalance);
-
-	/// @notice Emitted when a game ends.
 	event GameEnded(address indexed gameAddress, address winner, uint256 winnerReward, uint256 platformFee);
-
-	/// @notice Emitted when rewards are distributed to players.
 	event RewardsDistributed(address indexed player1, address indexed player2, address indexed winner, uint256 platformFee, uint256 reward);
-
-	/// @notice Emitted when Chess tokens are purchased with Ether.
 	event ChessTokensPurchased(address indexed buyer, uint256 ethSpent, uint256 chessBought);
-
-	/// @notice Emitted when Chess tokens are withdrawn by the owner.
 	event TokensWithdrawn(address indexed owner, uint256 amount);
-
-	/// @notice Emitted when Ether is withdrawn by the owner.
 	event EtherWithdrawn(address indexed owner, uint256 amount);
+
+	/* ========== CUSTOM ERRORS ========== */
+
+	error InvalidTemplateAddress();
+	error InvalidChessTokenAddress();
+	error InvalidBetAmount();
+	error StartTimeInPast();
+	error UserAlreadyRegistered();
+	error EmptyPseudo();
+	error InsufficientPlatformBalance();
+	error InsufficientAllowance();
+	error TokenTransferFailed();
+	error GameDoesNotExist();
+	error UserNotRegistered();
+	error InsufficientBalance();
+	error AlreadyRegisteredToGame();
+	error GameAlreadyFull();
+	error WinnerNotRegistered();
+	error InsufficientContractBalance();
+	error EtherTransferFailed();
+	error StartIndexOutOfBounds();
+
+	/* ========== MODIFIERS ========== */
+
+	modifier gameExists(address gameAddress) {
+		if (gameDetails[gameAddress].gameAddress == address(0)) {
+			revert GameDoesNotExist();
+		}
+		_;
+	}
+
+	modifier userRegistered(address user) {
+		if (users[user].userAddress == address(0)) {
+			revert UserNotRegistered();
+		}
+		_;
+	}
 
 	/* ========== CONSTRUCTOR ========== */
 
 	/// @notice Initializes the ChessFactory with the template address.
 	/// @param _templateAddress Address of the Chess game template contract.
 	constructor(address _templateAddress) Ownable(msg.sender) ReentrancyGuard() {
-		require(_templateAddress != address(0), "Invalid template address");
+		if (_templateAddress == address(0)) {
+			revert InvalidTemplateAddress();
+		}
 		templateAddress = _templateAddress;
 	}
 
@@ -100,17 +116,28 @@ contract ChessFactory is Ownable, ReentrancyGuard {
 	/// @notice Sets the address of the Chess ERC20 token contract.
 	/// @param _chessToken Address of the Chess token contract.
 	function setChessToken(address _chessToken) external onlyOwner {
-		require(_chessToken != address(0), "Invalid ChessToken address");
+		if (_chessToken == address(0)) {
+			revert InvalidChessTokenAddress();
+		}
 		chessTokenAddress = _chessToken;
 	}
 
 	/// @notice Deposits Chess tokens into the platform balance.
 	/// @param amount The amount of Chess tokens to deposit.
 	function depositTokens(uint256 amount) external onlyOwner nonReentrant {
-		require(chessTokenAddress != address(0), "ChessToken address not set");
+		if (chessTokenAddress == address(0)) {
+			revert InvalidChessTokenAddress();
+		}
+
 		IERC20 chessToken = IERC20(chessTokenAddress);
-		require(chessToken.allowance(msg.sender, address(this)) >= amount, "Insufficient allowance");
-		require(chessToken.transferFrom(msg.sender, address(this), amount), "Token transfer failed");
+		if (chessToken.allowance(msg.sender, address(this)) < amount) {
+			revert InsufficientAllowance();
+		}
+
+		if (!chessToken.transferFrom(msg.sender, address(this), amount)) {
+			revert TokenTransferFailed();
+		}
+
 		platformBalance += amount;
 	}
 
@@ -118,17 +145,23 @@ contract ChessFactory is Ownable, ReentrancyGuard {
 	/// @param betAmount The amount of Chess tokens to bet for the game.
 	/// @param startTime The scheduled start time for the game.
 	function createGame(uint256 betAmount, uint256 startTime) external onlyOwner nonReentrant {
-		require(betAmount > 0, "Bet amount must be greater than 0");
-		require(startTime > block.timestamp, "Start time must be in the future");
-		require(templateAddress != address(0), "Template address not set");
+		if (betAmount == 0) {
+			revert InvalidBetAmount();
+		}
+		if (startTime <= block.timestamp) {
+			revert StartTimeInPast();
+		}
+		if (templateAddress == address(0)) {
+			revert InvalidTemplateAddress();
+		}
 
-		// Créer un clone du modèle de jeu
+		// Create a clone of the game template
 		address clone = Clones.clone(templateAddress);
 
-		// Initialiser le jeu sans joueurs
-		ChessTemplate(clone).initialize(address(0), address(0), address(this));
+		// Initialize the game with no players
+		IChessTemplate(clone).initialize(address(0), address(0), address(this));
 
-		// Ajouter les détails du jeu
+		// Add game details
 		games.push(clone);
 		gameDetails[clone] = Game({
 			gameAddress: clone,
@@ -154,15 +187,21 @@ contract ChessFactory is Ownable, ReentrancyGuard {
 		uint256 platformFee,
 		uint256 reward
 	) external nonReentrant {
-		require(player1 != address(0) && player2 != address(0), "Invalid player addresses");
-		require(platformBalance >= platformFee, "Insufficient platform balance");
+		if (player1 == address(0) || player2 == address(0)) {
+			revert UserNotRegistered();
+		}
+		if (platformBalance < platformFee) {
+			revert InsufficientPlatformBalance();
+		}
 
 		// Distribute rewards
 		if (winner == address(0)) {
 			users[player1].balance += reward;
 			users[player2].balance += reward;
 		} else {
-			require(users[winner].userAddress != address(0), "Winner not registered");
+			if (users[winner].userAddress == address(0)) {
+				revert WinnerNotRegistered();
+			}
 			users[winner].balance += reward;
 		}
 
@@ -174,14 +213,26 @@ contract ChessFactory is Ownable, ReentrancyGuard {
 	/// @notice Allows the owner to withdraw a specified amount of ChessTokens from the contract.
 	/// @param amount The amount of ChessTokens to withdraw.
 	function withdrawTokens(uint256 amount) external onlyOwner nonReentrant {
-		require(chessTokenAddress != address(0), "ChessToken address not set");
+		if (chessTokenAddress == address(0)) {
+			revert InvalidChessTokenAddress();
+		}
+
 		IERC20 chessToken = IERC20(chessTokenAddress);
 		uint256 contractBalance = chessToken.balanceOf(address(this));
-		require(amount <= contractBalance, "Insufficient ChessToken balance in contract");
 
-		// Transfer tokens to the owner
-		bool success = chessToken.transfer(msg.sender, amount);
-		require(success, "Token transfer failed");
+		if (amount > contractBalance) {
+			revert InsufficientContractBalance();
+		}
+
+		// Update the platform balance
+		platformBalance -= amount;
+
+		// Transfer tokens using call
+		(bool success, bytes memory data) = address(chessToken).call(abi.encodeWithSelector(IERC20.transfer.selector, msg.sender, amount));
+
+		if (!success || (data.length > 0 && !abi.decode(data, (bool)))) {
+			revert TokenTransferFailed();
+		}
 
 		emit TokensWithdrawn(msg.sender, amount);
 	}
@@ -190,11 +241,15 @@ contract ChessFactory is Ownable, ReentrancyGuard {
 	/// @param amount The amount of Ether (in wei) to withdraw.
 	function withdrawEther(uint256 amount) external onlyOwner nonReentrant {
 		uint256 contractEthBalance = address(this).balance;
-		require(amount <= contractEthBalance, "Insufficient Ether balance in contract");
 
-		// Transfer Ether to the owner
+		if (amount > contractEthBalance) {
+			revert InsufficientContractBalance();
+		}
+
 		(bool success, ) = msg.sender.call{value: amount}("");
-		require(success, "Ether transfer failed");
+		if (!success) {
+			revert EtherTransferFailed();
+		}
 
 		emit EtherWithdrawn(msg.sender, amount);
 	}
@@ -204,29 +259,43 @@ contract ChessFactory is Ownable, ReentrancyGuard {
 	/// @notice Registers a new user with a chosen pseudo.
 	/// @param pseudo The pseudo chosen by the user.
 	function registerUser(string memory pseudo) external {
-		require(users[msg.sender].userAddress == address(0), "User already registered");
-		require(bytes(pseudo).length > 0, "Pseudo cannot be empty");
-		require(platformBalance >= 1000 * 10 ** 18, "Insufficient platform balance");
+		if (users[msg.sender].userAddress != address(0)) {
+			revert UserAlreadyRegistered();
+		}
+		if (bytes(pseudo).length == 0) {
+			revert EmptyPseudo();
+		}
+		if (platformBalance < 1000 * 1e18) {
+			revert InsufficientPlatformBalance();
+		}
 
-		users[msg.sender] = User({userAddress: msg.sender, pseudo: pseudo, balance: 1000 * 10 ** 18});
+		users[msg.sender] = User({userAddress: msg.sender, pseudo: pseudo, balance: 1000 * 1e18});
 
-		platformBalance -= 1000 * 10 ** 18;
+		platformBalance -= 1000 * 1e18;
 		userAddresses.push(msg.sender);
 
-		emit UserRegistered(msg.sender, pseudo, 1000 * 10 ** 18);
+		emit UserRegistered(msg.sender, pseudo, 1000 * 1e18);
 	}
 
 	/// @notice Allows users to purchase Chess tokens by sending Ether.
 	/// @param amountInEth The amount of Ether to spend for purchasing Chess tokens.
 	function buyChessTokens(uint256 amountInEth) external payable nonReentrant {
-		require(amountInEth > 0, "Amount must be greater than 0");
-		require(msg.value == amountInEth, "Sent Ether does not match specified amount");
-		require(chessTokenAddress != address(0), "ChessToken address not set");
+		if (amountInEth == 0) {
+			revert InvalidBetAmount();
+		}
+		if (msg.value != amountInEth) {
+			revert InvalidBetAmount();
+		}
+		if (chessTokenAddress == address(0)) {
+			revert InvalidChessTokenAddress();
+		}
 
-		uint256 amountToBuy = (amountInEth * 10 ** 18) / 0.000001 ether;
+		uint256 amountToBuy = (amountInEth * 1e18) / 0.000001 ether;
 
 		// Ensure the platform has enough Chess tokens to sell
-		require(platformBalance >= amountToBuy, "Not enough ChessTokens in the platform balance");
+		if (platformBalance < amountToBuy) {
+			revert InsufficientPlatformBalance();
+		}
 
 		// Update user and platform balances
 		users[msg.sender].balance += amountToBuy;
@@ -239,25 +308,29 @@ contract ChessFactory is Ownable, ReentrancyGuard {
 
 	/// @notice Registers the caller to a specific game.
 	/// @param gameAddress The address of the game to join.
-	function registerToGame(address gameAddress) external {
+	function registerToGame(address gameAddress) external gameExists(gameAddress) userRegistered(msg.sender) {
 		Game storage game = gameDetails[gameAddress];
 		User storage user = users[msg.sender];
 
-		require(game.gameAddress != address(0), "Game does not exist");
-		require(user.userAddress != address(0), "User not registered");
-		require(user.balance >= game.betAmount, "Insufficient balance");
-		require(playerToGame[msg.sender] == address(0), "Already registered to a game");
-		require(game.player1.userAddress == address(0) || game.player2.userAddress == address(0), "Game is already full");
+		if (user.balance < game.betAmount) {
+			revert InsufficientBalance();
+		}
+		if (playerToGame[msg.sender] != address(0)) {
+			revert AlreadyRegisteredToGame();
+		}
+		if (game.player1.userAddress != address(0) && game.player2.userAddress != address(0)) {
+			revert GameAlreadyFull();
+		}
 
 		if (game.player1.userAddress == address(0)) {
 			game.player1 = user;
-			ChessTemplate(game.gameAddress).setPlayer1(user.userAddress);
+			IChessTemplate(game.gameAddress).setPlayer1(user.userAddress);
 		} else if (game.player2.userAddress == address(0)) {
 			game.player2 = user;
-			ChessTemplate(game.gameAddress).setPlayer2(user.userAddress);
+			IChessTemplate(game.gameAddress).setPlayer2(user.userAddress);
 
 			// Activate the game only when both players are set
-			ChessTemplate(game.gameAddress).setGameActive();
+			IChessTemplate(game.gameAddress).setGameActive();
 		}
 
 		// Update balances and mappings
@@ -270,13 +343,17 @@ contract ChessFactory is Ownable, ReentrancyGuard {
 
 	/// @notice Starts a game once both players have joined and the start time has been reached.
 	/// @param gameAddress The address of the game to start.
-	function joinGame(address gameAddress) external nonReentrant {
+	function joinGame(address gameAddress) external nonReentrant gameExists(gameAddress) {
 		Game storage game = gameDetails[gameAddress];
-		require(game.gameAddress != address(0), "Game does not exist");
-		require(game.player1.userAddress != address(0), "Player 1 not registered");
-		require(game.player2.userAddress != address(0), "Player 2 not registered");
-		require(ChessTemplate(gameAddress).isGameActive(), "Game is not active");
-		require(block.timestamp >= game.startTime, "Game start time not reached");
+		if (game.player1.userAddress == address(0) || game.player2.userAddress == address(0)) {
+			revert UserNotRegistered();
+		}
+		if (!IChessTemplate(gameAddress).isGameActive()) {
+			revert InvalidChessTokenAddress(); // Reusing existing error; consider creating a specific error
+		}
+		if (block.timestamp < game.startTime) {
+			revert StartTimeInPast();
+		}
 
 		emit GameStarted(gameAddress, game.player1.userAddress, game.player2.userAddress, game.betAmount, block.timestamp);
 	}
@@ -287,8 +364,10 @@ contract ChessFactory is Ownable, ReentrancyGuard {
 	/// @param start Index to start from.
 	/// @param count Number of users to retrieve.
 	/// @return allUsers An array of User structs.
-	function getUsers(uint256 start, uint256 count) external view returns (User[] memory) {
-		require(start < userAddresses.length, "Start index out of bounds");
+	function getUsers(uint256 start, uint256 count) external view returns (User[] memory allUsers) {
+		if (start >= userAddresses.length) {
+			revert StartIndexOutOfBounds();
+		}
 
 		uint256 end = start + count;
 		if (end > userAddresses.length) {
@@ -296,21 +375,21 @@ contract ChessFactory is Ownable, ReentrancyGuard {
 		}
 
 		uint256 size = end - start;
-		User[] memory allUsers = new User[](size);
+		allUsers = new User[](size);
 
 		for (uint256 i = 0; i < size; i++) {
 			allUsers[i] = users[userAddresses[start + i]];
 		}
-
-		return allUsers;
 	}
 
 	/// @notice Retrieves a paginated list of all created games.
 	/// @param start Index to start from.
 	/// @param count Number of games to retrieve.
 	/// @return allGames An array of Game structs.
-	function getGames(uint256 start, uint256 count) external view returns (Game[] memory) {
-		require(start < games.length, "Start index out of bounds");
+	function getGames(uint256 start, uint256 count) external view returns (Game[] memory allGames) {
+		if (start >= games.length) {
+			revert StartIndexOutOfBounds();
+		}
 
 		uint256 end = start + count;
 		if (end > games.length) {
@@ -318,32 +397,24 @@ contract ChessFactory is Ownable, ReentrancyGuard {
 		}
 
 		uint256 size = end - start;
-		Game[] memory allGames = new Game[](size);
+		allGames = new Game[](size);
 
 		for (uint256 i = 0; i < size; i++) {
 			allGames[i] = gameDetails[games[start + i]];
 		}
-
-		return allGames;
 	}
 
 	/// @notice Retrieves details of a specific game.
 	/// @param gameAddress The address of the game to retrieve details for.
 	/// @return game The Game struct containing the game's details.
-	function getGameDetails(address gameAddress) external view returns (Game memory) {
-		Game storage game = gameDetails[gameAddress];
-		require(game.gameAddress != address(0), "Game does not exist");
-
-		return game;
+	function getGameDetails(address gameAddress) external view gameExists(gameAddress) returns (Game memory game) {
+		game = gameDetails[gameAddress];
 	}
 
 	/// @notice Retrieves the caller's user details.
 	/// @return user The User struct of the caller.
-	function getUser() external view returns (User memory) {
-		User storage user = users[msg.sender];
-		require(user.userAddress != address(0), "User not registered");
-
-		return user;
+	function getUser() external view userRegistered(msg.sender) returns (User memory user) {
+		user = users[msg.sender];
 	}
 
 	/* ========== FALLBACK FUNCTIONS ========== */
