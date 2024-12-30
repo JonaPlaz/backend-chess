@@ -1,5 +1,8 @@
 require("@nomicfoundation/hardhat-toolbox");
 require("@nomicfoundation/hardhat-verify");
+require("dotenv").config();
+
+const { INFURA_API_KEY, METAMASK_PRIVATE_KEY, ETHERSCAN_API_KEY } = process.env;
 
 module.exports = {
   solidity: {
@@ -17,5 +20,13 @@ module.exports = {
       chainId: 31337,
       loggingEnabled: true,
     },
+    holesky: {
+      url: `https://rpc.holesky.ethpandaops.io/${INFURA_API_KEY}`,
+      accounts: [`0x${METAMASK_PRIVATE_KEY}`],
+      chainId: 17000,
+    },
+  },
+  etherscan: {
+    apiKey: ETHERSCAN_API_KEY
   },
 };
