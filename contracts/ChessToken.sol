@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.27;
+pragma solidity ^0.8.27;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
  * @title ChessToken
@@ -11,8 +12,56 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
  *      This contract is owned by the deployer and uses OpenZeppelin libraries for security and modularity.
  */
 contract ChessToken is ERC20, Ownable, ReentrancyGuard {
+	using SafeERC20 for IERC20;
+
+	/// Custom errors for efficient error handling
+	error InvalidAddress();
+	error OnlyChessFactoryCanMint();
+	error InvalidRecipientAddress();
+	error AmountMustBeGreaterThanZero();
+	error CannotWithdrawChessToken();
+	error TokenTransferFailed();
+	error EtherNotAccepted();
+
 	/// @notice Address of the authorized ChessFactory contract
 	address public chessFactory;
+
+	// -------------------------------------------------------------
+	// Events
+	// -------------------------------------------------------------
+
+	/**
+	 * @dev Emitted when the ChessFactory address is set or updated.
+	 * @param previousFactory The address of the previous ChessFactory contract.
+	 * @param newFactory The address of the new ChessFactory contract.
+	 */
+	event ChessFactorySet(address indexed previousFactory, address indexed newFactory);
+
+	/**
+	 * @dev Emitted when ERC20 tokens are withdrawn from this contract.
+	 * @param token The address of the ERC20 token contract withdrawn.
+	 * @param to The address that received the withdrawn tokens.
+	 * @param amount The amount of tokens withdrawn.
+	 */
+	event ERC20Withdrawn(address indexed token, address indexed to, uint256 amount);
+
+	// -------------------------------------------------------------
+	// Modifiers
+	// -------------------------------------------------------------
+
+	/**
+	 * @dev Modifier to restrict access to only the ChessFactory contract.
+	 */
+	modifier onlyChessFactory() {
+		if (msg.sender != chessFactory) {
+			revert OnlyChessFactoryCanMint();
+		}
+		_;
+	}
+
+	// -------------------------------------------------------------
+	// Constructor
+	// -------------------------------------------------------------
 
 	/**
 	 * @dev Constructor to initialize the ChessToken contract with an initial supply.
@@ -33,8 +82,14 @@ contract ChessToken is ERC20, Ownable, ReentrancyGuard {
 	 * @param _chessFactory The address of the ChessFactory contract.
 	 */
 	function setChessFactory(address _chessFactory) external onlyOwner {
-		require(_chessFactory != address(0), "Invalid address");
+		if (_chessFactory == address(0)) {
+			revert InvalidAddress();
+		}
+
+		address previousFactory = chessFactory;
 		chessFactory = _chessFactory;
+
+		emit ChessFactorySet(previousFactory, _chessFactory);
 	}
 
 	// -------------------------------------------------------------
@@ -47,10 +102,13 @@ contract ChessToken is ERC20, Ownable, ReentrancyGuard {
 	 * @param to The address that will receive the minted tokens.
 	 * @param amount The amount of tokens to mint (in smallest units).
 	 */
-	function mintTokens(address to, uint256 amount) external nonReentrant {
-		require(msg.sender == chessFactory, "Only ChessFactory can mint tokens");
-		require(to != address(0), "Invalid recipient address");
-		require(amount > 0, "Amount must be greater than 0");
+	function mintTokens(address to, uint256 amount) external nonReentrant onlyChessFactory {
+		if (to == address(0)) {
+			revert InvalidRecipientAddress();
+		}
+		if (amount == 0) {
+			revert AmountMustBeGreaterThanZero();
+		}
 
 		_mint(to, amount);
 	}
@@ -61,7 +119,15 @@ contract ChessToken is ERC20, Ownable, ReentrancyGuard {
 	 * @param amount The amount of tokens to burn (in smallest units).
 	 */
 	function burn(uint256 amount) external nonReentrant {
-		require(amount > 0, "Amount must be greater than 0");
+		if (amount == 0) {
+			revert AmountMustBeGreaterThanZero();
+		}
+
+		uint256 accountBalance = balanceOf(msg.sender);
+		if (accountBalance < amount) {
+			revert("Burn amount exceeds balance");
+		}
+
 		_burn(msg.sender, amount);
 	}
 
@@ -76,12 +142,16 @@ contract ChessToken is ERC20, Ownable, ReentrancyGuard {
 	 * @param amount The amount of tokens to withdraw (in smallest units).
 	 */
 	function withdrawERC20(address token, uint256 amount) external onlyOwner nonReentrant {
-		require(token != address(this), "Cannot withdraw ChessToken itself");
-		require(amount > 0, "Amount must be greater than 0");
+		if (token == address(this)) {
+			revert CannotWithdrawChessToken();
+		}
+		if (amount == 0) {
+			revert AmountMustBeGreaterThanZero();
+		}
 
-		(bool success, bytes memory data) = token.call(abi.encodeWithSignature("transfer(address,uint256)", msg.sender, amount));
+		IERC20(token).safeTransfer(msg.sender, amount);
 
-		require(success && (data.length == 0 || abi.decode(data, (bool))), "Token transfer failed");
+		emit ERC20Withdrawn(token, msg.sender, amount);
 	}
 
 	// -------------------------------------------------------------
@@ -93,6 +163,6 @@ contract ChessToken is ERC20, Ownable, ReentrancyGuard {
 	 * @dev Prevents force-feeding Ether to the contract.
 	 */
 	receive() external payable {
-		revert("Contract does not accept Ether");
+		revert EtherNotAccepted();
 	}
 }
