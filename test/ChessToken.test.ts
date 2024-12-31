@@ -65,39 +65,6 @@ describe("ChessToken", function () {
         deployChessTokenFixture
       ));
     });
-
-    it("Should allow the owner to set the ChessFactory address", async function () {
-      await expect(chessToken.connect(owner).setChessFactory(addr1.address))
-        .to.emit(chessToken, "ChessFactorySet")
-        .withArgs(hre.ethers.ZeroAddress, addr1.address);
-
-      const chessFactory = await chessToken.chessFactory();
-      expect(chessFactory).to.equal(addr1.address);
-    });
-
-    it("Should emit ChessFactorySet event with previous and new factory addresses", async function () {
-      // First set
-      await chessToken.connect(owner).setChessFactory(addr1.address);
-      // Update to addr2
-      await expect(chessToken.connect(owner).setChessFactory(addr2.address))
-        .to.emit(chessToken, "ChessFactorySet")
-        .withArgs(addr1.address, addr2.address);
-
-      const chessFactory = await chessToken.chessFactory();
-      expect(chessFactory).to.equal(addr2.address);
-    });
-
-    it("Should revert when a non-owner tries to set the ChessFactory address", async function () {
-      await expect(
-        chessToken.connect(addr1).setChessFactory(addr2.address)
-      ).to.be.revertedWithCustomError(chessToken, "OwnableUnauthorizedAccount");
-    });
-
-    it("Should revert when setting the ChessFactory address to zero", async function () {
-      await expect(
-        chessToken.connect(owner).setChessFactory(hre.ethers.ZeroAddress)
-      ).to.be.revertedWithCustomError(chessToken, "InvalidAddress");
-    });
   });
 
   // Group tests related to minting functionality
@@ -111,16 +78,13 @@ describe("ChessToken", function () {
         deployChessTokenFixture
       ));
 
-      // Set addr1 as the ChessFactory
-      await chessToken.connect(owner).setChessFactory(addr1.address);
-
       // Define the mint amount
       mintAmount = hre.ethers.parseUnits("100", 18);
     });
 
-    it("Should allow the ChessFactory to mint tokens to a specified address", async function () {
-      // Mint tokens from ChessFactory (addr1) to addr2
-      await chessToken.connect(addr1).mintTokens(addr2.address, mintAmount);
+    it("Should allow the Owner to mint tokens to a specified address", async function () {
+      // Mint tokens from Owner to addr2
+      await chessToken.connect(owner).mintTokens(addr2.address, mintAmount);
 
       // Check the balance of addr2
       const addr2Balance = await chessToken.balanceOf(addr2.address);
@@ -133,29 +97,29 @@ describe("ChessToken", function () {
 
     it("Should emit Transfer event from zero address when minting tokens", async function () {
       await expect(
-        chessToken.connect(addr1).mintTokens(addr2.address, mintAmount)
+        chessToken.connect(owner).mintTokens(addr2.address, mintAmount)
       )
         .to.emit(chessToken, "Transfer")
         .withArgs(hre.ethers.ZeroAddress, addr2.address, mintAmount);
     });
 
-    it("Should revert when a non-ChessFactory tries to mint tokens", async function () {
+    it("Should revert when a non Owner tries to mint tokens", async function () {
       await expect(
-        chessToken.connect(owner).mintTokens(addr2.address, mintAmount)
-      ).to.be.revertedWithCustomError(chessToken, "OnlyChessFactoryCanMint");
+        chessToken.connect(addr1).mintTokens(addr2.address, mintAmount)
+      ).to.be.revertedWithCustomError(chessToken, "OwnableUnauthorizedAccount");
     });
 
     it("Should revert when minting to the zero address", async function () {
       await expect(
         chessToken
-          .connect(addr1)
+          .connect(owner)
           .mintTokens(hre.ethers.ZeroAddress, mintAmount)
       ).to.be.revertedWithCustomError(chessToken, "InvalidRecipientAddress");
     });
 
     it("Should revert when minting zero tokens", async function () {
       await expect(
-        chessToken.connect(addr1).mintTokens(addr2.address, 0)
+        chessToken.connect(owner).mintTokens(addr2.address, 0)
       ).to.be.revertedWithCustomError(
         chessToken,
         "AmountMustBeGreaterThanZero"

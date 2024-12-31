@@ -18,7 +18,6 @@ contract ChessToken is ERC20, Ownable, ReentrancyGuard {
 	// -------------------------------------------------------------
 
 	error InvalidAddress();
-	error OnlyChessFactoryCanMint();
 	error InvalidRecipientAddress();
 	error AmountMustBeGreaterThanZero();
 	error CannotWithdrawChessToken();
@@ -32,34 +31,7 @@ contract ChessToken is ERC20, Ownable, ReentrancyGuard {
 	// Events
 	// -------------------------------------------------------------
 
-	/**
-	 * @dev Emitted when the ChessFactory address is set or updated.
-	 * @param previousFactory The address of the previous ChessFactory contract.
-	 * @param newFactory The address of the new ChessFactory contract.
-	 */
-	event ChessFactorySet(address indexed previousFactory, address indexed newFactory);
-
-	/**
-	 * @dev Emitted when ERC20 tokens are withdrawn from this contract.
-	 * @param token The address of the ERC20 token contract withdrawn.
-	 * @param to The address that received the withdrawn tokens.
-	 * @param amount The amount of tokens withdrawn.
-	 */
 	event ERC20Withdrawn(address indexed token, address indexed to, uint256 amount);
-
-	// -------------------------------------------------------------
-	// Modifiers
-	// -------------------------------------------------------------
-
-	/**
-	 * @dev Modifier to restrict access to only the ChessFactory contract.
-	 */
-	modifier onlyChessFactory() {
-		if (msg.sender != chessFactory) {
-			revert OnlyChessFactoryCanMint();
-		}
-		_;
-	}
 
 	// -------------------------------------------------------------
 	// Constructor
@@ -75,36 +47,16 @@ contract ChessToken is ERC20, Ownable, ReentrancyGuard {
 	}
 
 	// -------------------------------------------------------------
-	// Configuration Functions (Owner Only)
-	// -------------------------------------------------------------
-
-	/**
-	 * @notice Sets the address of the ChessFactory contract.
-	 * @dev Can only be called by the owner of the contract.
-	 * @param _chessFactory The address of the ChessFactory contract.
-	 */
-	function setChessFactory(address _chessFactory) external onlyOwner {
-		if (_chessFactory == address(0)) {
-			revert InvalidAddress();
-		}
-
-		address previousFactory = chessFactory;
-		chessFactory = _chessFactory;
-
-		emit ChessFactorySet(previousFactory, _chessFactory);
-	}
-
-	// -------------------------------------------------------------
 	// Core ERC20 Functions
 	// -------------------------------------------------------------
 
 	/**
-	 * @notice Allows the ChessFactory contract to mint new tokens.
-	 * @dev Can only be called by the ChessFactory contract.
+	 * @notice Allows the Owner of contract to mint new tokens.
+	 * @dev Can only be called by the Owner.
 	 * @param to The address that will receive the minted tokens.
 	 * @param amount The amount of tokens to mint (in smallest units).
 	 */
-	function mintTokens(address to, uint256 amount) external nonReentrant onlyChessFactory {
+	function mintTokens(address to, uint256 amount) external nonReentrant onlyOwner() {
 		if (to == address(0)) {
 			revert InvalidRecipientAddress();
 		}
