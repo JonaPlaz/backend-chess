@@ -77,6 +77,7 @@ contract ChessFactory is Ownable, ReentrancyGuard {
 	error GameDoesNotExist();
 	error UserNotRegistered();
 	error InsufficientBalance();
+	error AlreadyRegisteredToGame();
 	error GameAlreadyFull();
 	error WinnerNotRegistered();
 	error InsufficientContractBalance();
@@ -317,6 +318,9 @@ contract ChessFactory is Ownable, ReentrancyGuard {
 
 		if (user.balance < game.betAmount) {
 			revert InsufficientBalance();
+		}
+		if (playerToGame[msg.sender] != address(0)) {
+			revert AlreadyRegisteredToGame();
 		}
 		if (game.player1.userAddress != address(0) && game.player2.userAddress != address(0)) {
 			revert GameAlreadyFull();
