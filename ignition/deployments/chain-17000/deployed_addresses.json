@@ -1,6 +1,6 @@
 {
-  "ChessModule#ChessControl": "0xD4c7f2F49F30e5D19dfde7026657705631bf02Da",
-  "ChessModule#ChessTemplate": "0xD47073Bb626914bc8111A9DbCF56FBD6aBBA1f9B",
-  "ChessModule#ChessToken": "0xBE2Dcc0A613B4B82ceC44CA68C7C97fE2615D6bC",
-  "ChessModule#ChessFactory": "0xA764cc028EBD082bD47264399dF3994442010324"
+  "ChessModule#ChessControl": "0xc2fcAc4a8Ad3482aF6517E519044B49691EfD01E",
+  "ChessModule#ChessTemplate": "0x9447c42e335350bF3fEFE1fc2C45c80D17E770F4",
+  "ChessModule#ChessToken": "0xC9E82807FE280d8Cb1729eB38379E4d068d6F666",
+  "ChessModule#ChessFactory": "0x5BfcACcdB46AfE4fADA538d6dF9BBFF69529Ad7D"
 }
