@@ -48,20 +48,6 @@ contract ChessToken is ERC20, Ownable, ReentrancyGuard {
 	event ERC20Withdrawn(address indexed token, address indexed to, uint256 amount);
 
 	// -------------------------------------------------------------
-	// Modifiers
-	// -------------------------------------------------------------
-
-	/**
-	 * @dev Modifier to restrict access to only the ChessFactory contract.
-	 */
-	modifier onlyChessFactory() {
-		if (msg.sender != chessFactory) {
-			revert OnlyChessFactoryCanMint();
-		}
-		_;
-	}
-
-	// -------------------------------------------------------------
 	// Constructor
 	// -------------------------------------------------------------
 
@@ -99,12 +85,12 @@ contract ChessToken is ERC20, Ownable, ReentrancyGuard {
 	// -------------------------------------------------------------
 
 	/**
-	 * @notice Allows the ChessFactory contract to mint new tokens.
+	 * @notice Allows the Owner of contract to mint new tokens.
 	 * @dev Can only be called by the ChessFactory contract.
 	 * @param to The address that will receive the minted tokens.
 	 * @param amount The amount of tokens to mint (in smallest units).
 	 */
-	function mintTokens(address to, uint256 amount) external nonReentrant onlyChessFactory {
+	function mintTokens(address to, uint256 amount) external nonReentrant onlyOwner() {
 		if (to == address(0)) {
 			revert InvalidRecipientAddress();
 		}
