@@ -1,0 +1,46 @@
+# Nom du workflow - identifie ce workflow parmi d'autres dans le projet
+name: Test Suite
+
+# Définit les événements qui déclenchent l'exécution de ce workflow
+on:
+  push:
+    branches:
+      - 'dev'  # Déclenche le workflow sur tous les push, quelle que soit la branche (dev, feature, main, etc.)
+
+# Définition des jobs à exécuter dans ce workflow
+jobs:
+  # Définition d'un job nommé "tests"
+  tests:
+    # Nom lisible du job, affiché dans l'interface GitHub Actions
+    name: Smart Contract Tests
+    # Spécifie l'environnement d'exécution - ici, la dernière version d'Ubuntu
+    runs-on: ubuntu-latest
+    # Liste ordonnée des étapes à exécuter dans ce job
+    steps:
+      # Étape 1 : Récupération du code source du dépôt
+      - name: Checkout Repository
+        uses: actions/checkout@v3  # Utilise l'action officielle GitHub pour cloner le dépôt
+
+      # Étape 2 : Configuration de l'environnement Node.js
+      - name: Use Node.js 22.11.0
+        uses: actions/setup-node@v1  # Utilise l'action officielle pour configurer Node.js
+        with:
+          node-version: 22.11.0  # Spécifie la version exacte de Node.js à utiliser
+
+      # Étape 3 : Mise en cache des modules Node pour accélérer les builds futurs
+      - name: Cache Node Modules
+        id: cache-node-modules  # Identifiant unique pour cette étape, utilisé pour la condition de l'étape suivante
+        uses: actions/cache@v2  # Utilise l'action de cache officielle de GitHub
+        with:
+          path: 'node_modules'  # Chemin des fichiers à mettre en cache (dossier node_modules)
+          key: node_modules-${{ hashFiles('package-lock.json') }}  # Clé unique basée sur le contenu de package-lock.json
+
+      # Étape 4 : Installation des dépendances du projet
+      - name: Install dependencies
+        # Condition : exécute cette étape seulement si le cache n'a pas été trouvé (évite une réinstallation inutile)
+        if: steps.cache-node-modules.outputs.cache-hit != 'true'
+        run: yarn ci  # Utilise 'npm ci' pour une installation propre et reproductible basée sur yarn-lock
+
+      # Étape 5 : Exécution des tests des smart contracts
+      - name: Run Tests
+        run: npx hardhat test  # Exécute les tests avec Hardhat, un environnement de développement Ethereum
