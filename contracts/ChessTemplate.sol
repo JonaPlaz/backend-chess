@@ -130,7 +130,7 @@ contract ChessTemplate is ChessControl, ReentrancyGuard, Ownable {
 	 * @dev This function can only be called once by the owner to set up the game.
 	 * @param _chessFactory Address of the ChessFactory contract.
 	 */
-	function initialize(address _chessFactory) external {
+	function initialize(address _chessFactory) external nonReentrant {
 		if (_chessFactory == address(0)) revert InvalidChessFactory();
 
 		chessFactory = IChessFactory(_chessFactory);

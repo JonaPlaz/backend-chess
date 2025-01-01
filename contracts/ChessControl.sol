@@ -563,11 +563,7 @@ contract ChessControl {
 		uint256 newGameState;
 		uint8 toPos;
 
-		for (
-			toPos = uint8(int8(fromPos) + step);
-			(toPos & 0x7) != limitCheck && toPos < 0x40 && toPos >= 0;
-			toPos = uint8(int8(toPos) + step)
-		) {
+		for (toPos = uint8(int8(fromPos) + step); (toPos & 0x7) != limitCheck && toPos < 0x40; toPos = uint8(int8(toPos) + step)) {
 			newGameState = verifyExecuteBishopMove(gameState, fromPos, toPos, currentTurnBlack);
 			if ((newGameState != invalid_move_constant) && (!pieceUnderAttack(newGameState, kingPos))) {
 				return true;
@@ -602,11 +598,7 @@ contract ChessControl {
 		uint256 newGameState;
 		uint8 toPos;
 
-		for (
-			toPos = uint8(int8(fromPos) + step);
-			(toPos & 0x7) != limitCheck && toPos < 0x40 && toPos >= 0;
-			toPos = uint8(int8(toPos) + step)
-		) {
+		for (toPos = uint8(int8(fromPos) + step); (toPos & 0x7) != limitCheck && toPos < 0x40; toPos = uint8(int8(toPos) + step)) {
 			newGameState = verifyExecuteRookMove(gameState, fromPos, toPos, currentTurnBlack);
 			if ((newGameState != invalid_move_constant) && (!pieceUnderAttack(newGameState, kingPos))) {
 				return true;

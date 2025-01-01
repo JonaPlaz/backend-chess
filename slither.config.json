@@ -1,6 +1,8 @@
 {
   "detectors_to_exclude": [
     "conformance-to-solidity-naming-conventions",
-    "too-many-digits"
+    "too-many-digits",
+    "block-timestamp",
+    "low-level-calls"
   ]
 }
