@@ -3,7 +3,7 @@ name: Test and Analyze Smart Contracts
 on:
   push:
     branches:
-      - 'dev'
+      - "dev"
 
 jobs:
   tests:
@@ -13,15 +13,18 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v3
 
-      # Étape 2 : Configuration de Python pour Slither
+      # Étape 2 : Installation de Python pour Slither
       - name: Setup Python
         uses: actions/setup-python@v3
         with:
-          python-version: '3.9'
+          python-version: "3.9"
 
-      # Étape 3 : Installation de Slither et des dépendances
-      - name: Install Slither and Dependencies
+      # Étape 3 : Installation de Slither et du compilateur Solidity
+      - name: Install Slither and Solidity Compiler
         run: |
+          sudo apt-get update
+          sudo apt-get install -y software-properties-common
+          sudo add-apt-repository -y ppa:ethereum/ethereum
           sudo apt-get update
           sudo apt-get install -y solc
           pip install slither-analyzer
@@ -32,11 +35,24 @@ jobs:
         with:
           node-version: 22.11.0
 
-      # Étape 5 : Installation des dépendances avec Yarn
+      # Étape 5 : Gestion du cache des dépendances Yarn
+      - name: Cache Yarn Modules
+        id: cache-yarn-modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            .yarn/cache
+            node_modules
+          key: yarn-cache-${{ hashFiles('yarn.lock') }}
+          restore-keys: |
+            yarn-cache-
+
+      # Étape 6 : Installation des dépendances avec Yarn
       - name: Install Dependencies
+        if: steps.cache-yarn-modules.outputs.cache-hit != 'true'
         run: yarn install --frozen-lockfile
 
-      # Étape 6 : Nettoyage des contrats
+      # Étape 7 : Nettoyage des contrats
       - name: Run Hardhat Clean
         env:
           INFURA_API_KEY: ${{ secrets.INFURA_API_KEY }}
@@ -44,7 +60,7 @@ jobs:
           ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
         run: yarn hardhat clean
 
-      # Étape 7 : Compilation des contrats
+      # Étape 8 : Compilation des contrats
       - name: Compile Contracts
         env:
           INFURA_API_KEY: ${{ secrets.INFURA_API_KEY }}
@@ -52,11 +68,11 @@ jobs:
           ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
         run: yarn hardhat compile
 
-      # Étape 8 : Analyse avec Slither
+      # Étape 9 : Analyse avec Slither
       - name: Run Slither Analysis
         run: slither . || true
 
-      # Étape 9 : Exécution des tests Hardhat
+      # Étape 10 : Exécution des tests Hardhat
       - name: Run Hardhat Tests
         env:
           INFURA_API_KEY: ${{ secrets.INFURA_API_KEY }}
