@@ -38,7 +38,7 @@ jobs:
       # Étape 5 : Gestion du cache des dépendances Yarn
       - name: Cache Yarn Modules
         id: cache-yarn-modules  # Identifiant unique pour cette étape, utilisé pour la condition de l'étape suivante
-        uses: actions/cache@v2  # Utilise l'action de cache officielle de GitHub
+        uses: actions/cache@v3  # Utilise l'action de cache officielle de GitHub
         with:
           path: .yarn/cache  # Chemin des fichiers à mettre en cache
           key: yarn-cache-${{ hashFiles('yarn.lock') }}  # Clé unique basée sur le contenu de yarn.lock
