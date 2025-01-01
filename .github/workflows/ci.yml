@@ -9,49 +9,50 @@ jobs:
   tests:
     runs-on: ubuntu-24.04
     steps:
-      # Étape 1 : Récupération du code source
       - name: Checkout Repository
         uses: actions/checkout@v3
 
-      # Étape 2 : Installation de Python et pip
       - name: Setup Python
         uses: actions/setup-python@v3
         with:
-          python-version: "3.9" # Version compatible avec Slither
+          python-version: "3.9"
 
-      # Étape 3 : Installation de Slither et de ses dépendances
-      - name: Install Slither and dependencies
+      - name: Install Solidity Compiler (solc)
         run: |
           sudo apt-get update
-          sudo apt-get install -y solc  # Installe le compilateur Solidity
-          pip install slither-analyzer  # Installe Slither
+          sudo apt-get install -y software-properties-common
+          sudo add-apt-repository ppa:ethereum/ethereum
+          sudo apt-get update
+          sudo apt-get install -y solc
 
-      # Étape 4 : Analyse statique avec Slither
+      - name: Install Slither and dependencies
+        run: pip install slither-analyzer
+
       - name: Run Slither Analysis
         run: |
-          slither . --config-file slither.config.json || true  # Continue même si des problèmes sont détectés
+          slither . --config-file slither.config.json || true
 
-      # Étape 5 : Mise en cache des modules Yarn pour accélérer les builds futurs
-      - name: Cache Yarn Modules
-        id: cache-yarn-modules
-        uses: actions/cache@v3
-        with:
-          path: .yarn/cache
-          key: yarn-cache-${{ hashFiles('yarn.lock') }}
-          restore-keys: |
-            yarn-cache-
-
-      # Étape 6 : Installation de Node.js
       - name: Use Node.js 22.11.0
         uses: actions/setup-node@v3
         with:
           node-version: 22.11.0
 
-      # Étape 7 : Installation des dépendances avec Yarn
+      - name: Cache Yarn Modules
+        id: cache-yarn-modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            .yarn/cache
+            node_modules
+            ~/.yarn
+          key: yarn-cache-${{ hashFiles('yarn.lock') }}
+          restore-keys: |
+            yarn-cache-
+
       - name: Install dependencies
+        if: steps.cache-yarn-modules.outputs.cache-hit != 'true'
         run: yarn install --frozen-lockfile
 
-      # Étape 8 : Exécution des tests Hardhat
       - name: Run Hardhat Tests
         env:
           INFURA_API_KEY: ${{ secrets.INFURA_API_KEY }}
