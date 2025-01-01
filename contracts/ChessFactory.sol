@@ -311,7 +311,7 @@ contract ChessFactory is Ownable, ReentrancyGuard {
 
 	/// @notice Registers the caller to a specific game.
 	/// @param gameAddress The address of the game to join.
-	function registerToGame(address gameAddress) external gameExists(gameAddress) onlyUser(msg.sender) {
+	function registerToGame(address gameAddress) external gameExists(gameAddress) onlyUser(msg.sender) nonReentrant {
 		Game storage game = gameDetails[gameAddress];
 		User storage user = users[msg.sender];
 

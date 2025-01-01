@@ -65,6 +65,8 @@ contract ChessTemplate is ChessControl, ReentrancyGuard, Ownable {
 	// ============ EVENTS ============
 	// ===============================
 
+	event Player1Set(address indexed previousPlayer1, address indexed newPlayer1);
+	event Player2Set(address indexed previousPlayer2, address indexed newPlayer2);
 	event GameStarted(address indexed player1, address indexed player2, uint256 betAmount);
 	event MovePlayed(address indexed player, uint16 move);
 	event DrawProposed(address indexed proposer);
@@ -160,6 +162,10 @@ contract ChessTemplate is ChessControl, ReentrancyGuard, Ownable {
 	function setPlayer1(address _player1) external onlyChessFactory {
 		if (player1 != address(0)) revert AlreadyInitialized();
 		if (_player1 == address(0)) revert InvalidPlayers();
+
+		// Émettre un événement pour signaler la modification
+		emit Player1Set(player1, _player1);
+
 		player1 = _player1;
 	}
 
@@ -171,6 +177,10 @@ contract ChessTemplate is ChessControl, ReentrancyGuard, Ownable {
 	function setPlayer2(address _player2) external onlyChessFactory {
 		if (player2 != address(0)) revert AlreadyInitialized();
 		if (_player2 == address(0)) revert InvalidPlayers();
+
+		// Émettre un événement pour signaler la modification
+		emit Player2Set(player2, _player2);
+
 		player2 = _player2;
 	}
 
@@ -220,7 +230,7 @@ contract ChessTemplate is ChessControl, ReentrancyGuard, Ownable {
 	function _finalizeGame(uint16 outcome) internal {
 		gameActive = false;
 		status = GameStatus.Ended;
-		address winner;
+		address winner = address(0); // Initialisation explicite de winner
 
 		if (outcome == white_win_outcome) {
 			winner = player1;

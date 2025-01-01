@@ -533,19 +533,19 @@ contract ChessControl {
 		uint256 newGameState;
 		uint8 toPos;
 
-		for (
-			toPos = uint8(int8(fromPos) + step);
-			(toPos & 0x7) != limitCheck && toPos < 0x40 && toPos >= 0;
-			toPos = uint8(int8(toPos) + step)
-		) {
+		for (toPos = uint8(int8(fromPos) + step); (toPos & 0x7) != limitCheck && toPos < 0x40; toPos = uint8(int8(toPos) + step)) {
 			newGameState = verifyExecuteQueenMove(gameState, fromPos, toPos, currentTurnBlack);
-			if ((newGameState != invalid_move_constant) && (!pieceUnderAttack(newGameState, kingPos))) {
+
+			if (newGameState != invalid_move_constant && !pieceUnderAttack(newGameState, kingPos)) {
 				return true;
 			}
+
+			// Si une pièce est rencontrée, arrêter la boucle
 			if (((gameState >> (toPos << piece_pos_shift_bit)) & 0xF) != 0) {
 				break;
 			}
 		}
+
 		return false;
 	}
 
