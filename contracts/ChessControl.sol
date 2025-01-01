@@ -5,7 +5,6 @@ pragma solidity 0.8.27;
 // corriger bug sur invalid check state
 
 contract ChessControl {
-	uint8 constant empty_const = 0x0;
 	uint8 constant pawn_const = 0x1; // 001
 	uint8 constant bishop_const = 0x2; // 010
 	uint8 constant knight_const = 0x3; // 011
@@ -19,7 +18,6 @@ contract ChessControl {
 	uint8 constant piece_pos_shift_bit = 2;
 
 	uint32 constant en_passant_const = 0x000000ff;
-	uint32 constant king_pos_mask = 0x0000ff00;
 	uint32 constant king_pos_zero_mask = 0xffff00ff;
 	uint16 constant king_pos_bit = 8;
 	/**
@@ -30,13 +28,6 @@ contract ChessControl {
 	uint32 constant rook_queen_side_move_mask = 0x80000000;
 	uint16 constant rook_queen_side_move_bit = 24;
 	uint32 constant king_move_mask = 0x80800000;
-
-	uint16 constant pieces_left_bit = 32;
-
-	uint8 constant king_white_start_pos = 0x04;
-	uint8 constant king_black_start_pos = 0x3c;
-
-	uint16 constant pos_move_mask = 0xfff;
 
 	uint16 constant request_draw_const = 0x1000;
 	uint16 constant accept_draw_const = 0x2000;

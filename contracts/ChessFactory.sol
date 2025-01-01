@@ -11,7 +11,7 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 // Interface for ChessTemplate to interact without importing the contract
 interface IChessTemplate {
-	function initialize(address _player1, address _player2, address _factory) external;
+	function initialize(address _factory) external;
 	function setPlayer1(address _player1) external;
 	function setPlayer2(address _player2) external;
 	function setGameActive() external;
@@ -150,6 +150,8 @@ contract ChessFactory is Ownable, ReentrancyGuard {
 	}
 
 	/// @notice Creates a new chess game with a specified bet amount and start time.
+	/// @dev Uses the OpenZeppelin Clones library, which implements the EIP-1167 minimal proxy pattern.
+	///      The `assembly` code in Clones.sol is safe and well-audited to reduce deployment costs.
 	/// @param betAmount The amount of Chess tokens to bet for the game.
 	/// @param startTime The scheduled start time for the game.
 	function createGame(uint256 betAmount, uint256 startTime) external onlyOwner {
@@ -163,10 +165,11 @@ contract ChessFactory is Ownable, ReentrancyGuard {
 			revert InvalidTemplateAddress();
 		}
 
+		// Use OpenZeppelin Clones to create a new proxy contract
 		address clone = Clones.clone(templateAddress);
-		IChessTemplate(clone).initialize(address(0), address(0), address(this));
+		IChessTemplate(clone).initialize(address(this));
 
-		// Add game details
+		// Store game details
 		games.push(clone);
 		gameDetails[clone] = Game({
 			gameAddress: clone,

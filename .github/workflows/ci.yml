@@ -37,11 +37,11 @@ jobs:
 
       # Étape 5 : Gestion du cache des dépendances Yarn
       - name: Cache Yarn Modules
-        id: cache-yarn-modules  # Identifiant unique pour cette étape, utilisé pour la condition de l'étape suivante
-        uses: actions/cache@v3  # Utilise l'action de cache officielle de GitHub
+        id: cache-yarn-modules # Identifiant unique pour cette étape, utilisé pour la condition de l'étape suivante
+        uses: actions/cache@v3 # Utilise l'action de cache officielle de GitHub
         with:
-          path: .yarn/cache  # Chemin des fichiers à mettre en cache
-          key: yarn-cache-${{ hashFiles('yarn.lock') }}  # Clé unique basée sur le contenu de yarn.lock
+          path: .yarn/cache # Chemin des fichiers à mettre en cache
+          key: yarn-cache-${{ hashFiles('yarn.lock') }} # Clé unique basée sur le contenu de yarn.lock
 
       # Étape 6 : Installation des dépendances avec Yarn
       - name: Install Dependencies
@@ -66,7 +66,8 @@ jobs:
 
       # Étape 9 : Analyse avec Slither
       - name: Run Slither Analysis
-        run: slither . || true
+        run: |
+          slither . --config-file slither.config.json --filter-paths node_modules || true
 
       # Étape 10 : Exécution des tests Hardhat
       - name: Run Hardhat Tests

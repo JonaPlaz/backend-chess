@@ -67,7 +67,7 @@ contract ChessTemplate is ChessControl, ReentrancyGuard, Ownable {
 
 	event Player1Set(address indexed previousPlayer1, address indexed newPlayer1);
 	event Player2Set(address indexed previousPlayer2, address indexed newPlayer2);
-	event GameStarted(address indexed player1, address indexed player2, uint256 betAmount);
+	event GameStarted(uint256 betAmount);
 	event MovePlayed(address indexed player, uint16 move);
 	event DrawProposed(address indexed proposer);
 	event DrawAccepted(address indexed proposer, address indexed accepter);
@@ -128,22 +128,18 @@ contract ChessTemplate is ChessControl, ReentrancyGuard, Ownable {
 	/**
 	 * @notice Initializes the cloned ChessTemplate contract with fixed parameters.
 	 * @dev This function can only be called once by the owner to set up the game.
-	 * @param _player1 Address of the first player.
-	 * @param _player2 Address of the second player.
 	 * @param _chessFactory Address of the ChessFactory contract.
 	 */
-	function initialize(address _player1, address _player2, address _chessFactory) external {
+	function initialize(address _chessFactory) external {
 		if (_chessFactory == address(0)) revert InvalidChessFactory();
 
 		chessFactory = IChessFactory(_chessFactory);
-		player1 = _player1;
-		player2 = _player2;
 
 		gameActive = false;
 		status = GameStatus.Inactive;
 		moveCount = 0;
 
-		emit GameStarted(player1, player2, BET_AMOUNT);
+		emit GameStarted(BET_AMOUNT);
 	}
 
 	/**

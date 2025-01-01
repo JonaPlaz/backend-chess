@@ -82,14 +82,10 @@ describe("ChessTemplate", function () {
 
       // Initialize the ChessTemplate contract
       await chessTemplate.initialize(
-        addr1.address,
-        addr2.address,
         chessFactory.target
       );
 
       // Verify initialization
-      expect(await chessTemplate.player1()).to.equal(addr1.address);
-      expect(await chessTemplate.player2()).to.equal(addr2.address);
       expect(await chessTemplate.status()).to.equal(0); // GameStatus.Inactive
       expect(await chessTemplate.gameActive()).to.equal(false);
     });
@@ -343,8 +339,6 @@ describe("ChessTemplate", function () {
     it("Should revert if ChessFactory address is zero during initialization", async function () {
       await expect(
         chessTemplate.initialize(
-          addr1.address,
-          addr2.address,
           hre.ethers.ZeroAddress
         )
       ).to.be.revertedWithCustomError(chessTemplate, "InvalidChessFactory");
