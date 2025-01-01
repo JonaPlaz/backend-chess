@@ -5,7 +5,7 @@ name: Test Suite
 on:
   push:
     branches:
-      - 'dev'  # Déclenche le workflow sur tous les push, quelle que soit la branche (dev, feature, main, etc.)
+      - 'dev'  # Déclenche le workflow sur la branche dev
 
 # Définition des jobs à exécuter dans ce workflow
 jobs:
@@ -23,24 +23,24 @@ jobs:
 
       # Étape 2 : Configuration de l'environnement Node.js
       - name: Use Node.js 22.11.0
-        uses: actions/setup-node@v1  # Utilise l'action officielle pour configurer Node.js
+        uses: actions/setup-node@v3  # Utilise l'action officielle pour configurer Node.js
         with:
           node-version: 22.11.0  # Spécifie la version exacte de Node.js à utiliser
 
-      # Étape 3 : Mise en cache des modules Node pour accélérer les builds futurs
-      - name: Cache Node Modules
-        id: cache-node-modules  # Identifiant unique pour cette étape, utilisé pour la condition de l'étape suivante
+      # Étape 3 : Mise en cache des modules Yarn pour accélérer les builds futurs
+      - name: Cache Yarn Modules
+        id: cache-yarn-modules  # Identifiant unique pour cette étape, utilisé pour la condition de l'étape suivante
         uses: actions/cache@v2  # Utilise l'action de cache officielle de GitHub
         with:
-          path: 'node_modules'  # Chemin des fichiers à mettre en cache (dossier node_modules)
-          key: node_modules-${{ hashFiles('package-lock.json') }}  # Clé unique basée sur le contenu de package-lock.json
+          path: .yarn/cache  # Chemin des fichiers à mettre en cache
+          key: yarn-cache-${{ hashFiles('yarn.lock') }}  # Clé unique basée sur le contenu de yarn.lock
 
       # Étape 4 : Installation des dépendances du projet
       - name: Install dependencies
         # Condition : exécute cette étape seulement si le cache n'a pas été trouvé (évite une réinstallation inutile)
-        if: steps.cache-node-modules.outputs.cache-hit != 'true'
-        run: yarn ci  # Utilise 'npm ci' pour une installation propre et reproductible basée sur yarn-lock
+        if: steps.cache-yarn-modules.outputs.cache-hit != 'true'
+        run: yarn install --frozen-lockfile  # Installation propre et reproductible avec Yarn
 
       # Étape 5 : Exécution des tests des smart contracts
       - name: Run Tests
-        run: npx hardhat test  # Exécute les tests avec Hardhat, un environnement de développement Ethereum
+        run: npx hardhat test  # Exécute les tests avec Hardhat et Yarn
