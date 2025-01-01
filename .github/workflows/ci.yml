@@ -5,7 +5,7 @@ name: Test Suite
 on:
   push:
     branches:
-      - 'dev'  # Déclenche le workflow sur la branche dev
+      - "dev" # Déclenche le workflow sur la branche dev
 
 # Définition des jobs à exécuter dans ce workflow
 jobs:
@@ -44,4 +44,8 @@ jobs:
 
       # Étape 5 : Exécution des tests des smart contracts
       - name: Run Tests
+        env: # Injection des secrets dans l'environnement
+          INFURA_API_KEY: ${{ secrets.INFURA_API_KEY }}
+          METAMASK_PRIVATE_KEY: ${{ secrets.METAMASK_PRIVATE_KEY }}
+          ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
         run: npx hardhat test
