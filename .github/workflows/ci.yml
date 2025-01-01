@@ -13,34 +13,35 @@ jobs:
   tests:
     # Nom lisible du job, affiché dans l'interface GitHub Actions
     name: Smart Contract Tests
-    # Spécifie l'environnement d'exécution - ici, la dernière version d'Ubuntu
-    runs-on: ubuntu-latest
+    # Spécifie explicitement la version d'Ubuntu
+    runs-on: ubuntu-24.04
     # Liste ordonnée des étapes à exécuter dans ce job
     steps:
       # Étape 1 : Récupération du code source du dépôt
       - name: Checkout Repository
-        uses: actions/checkout@v3  # Utilise l'action officielle GitHub pour cloner le dépôt
+        uses: actions/checkout@v3
 
       # Étape 2 : Configuration de l'environnement Node.js
       - name: Use Node.js 22.11.0
-        uses: actions/setup-node@v3  # Utilise l'action officielle pour configurer Node.js
+        uses: actions/setup-node@v3
         with:
-          node-version: 22.11.0  # Spécifie la version exacte de Node.js à utiliser
+          node-version: 22.11.0
 
       # Étape 3 : Mise en cache des modules Yarn pour accélérer les builds futurs
       - name: Cache Yarn Modules
-        id: cache-yarn-modules  # Identifiant unique pour cette étape, utilisé pour la condition de l'étape suivante
-        uses: actions/cache@v2  # Utilise l'action de cache officielle de GitHub
+        id: cache-yarn-modules
+        uses: actions/cache@v3
         with:
-          path: .yarn/cache  # Chemin des fichiers à mettre en cache
-          key: yarn-cache-${{ hashFiles('yarn.lock') }}  # Clé unique basée sur le contenu de yarn.lock
+          path: .yarn/cache
+          key: yarn-cache-${{ hashFiles('yarn.lock') }}
+          restore-keys: |
+            yarn-cache-
 
       # Étape 4 : Installation des dépendances du projet
       - name: Install dependencies
-        # Condition : exécute cette étape seulement si le cache n'a pas été trouvé (évite une réinstallation inutile)
         if: steps.cache-yarn-modules.outputs.cache-hit != 'true'
-        run: yarn install --frozen-lockfile  # Installation propre et reproductible avec Yarn
+        run: yarn install --frozen-lockfile
 
       # Étape 5 : Exécution des tests des smart contracts
       - name: Run Tests
-        run: npx hardhat test  # Exécute les tests avec Hardhat et Yarn
+        run: npx hardhat test
