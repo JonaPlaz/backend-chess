@@ -1,0 +1,3 @@
+{
+  "exclude": ["contracts-that-lock-ether"]
+}

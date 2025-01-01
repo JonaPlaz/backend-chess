@@ -22,7 +22,7 @@ module.exports = {
     },
     holesky: {
       url: `https://rpc.holesky.ethpandaops.io/${INFURA_API_KEY}`,
-      accounts: [`0x${METAMASK_PRIVATE_KEY}`],
+      accounts: METAMASK_PRIVATE_KEY ? [`0x${METAMASK_PRIVATE_KEY}`] : [],
       chainId: 17000,
     },
   },
