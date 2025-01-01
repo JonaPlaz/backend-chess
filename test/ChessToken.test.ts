@@ -111,9 +111,7 @@ describe("ChessToken", function () {
 
     it("Should revert when minting to the zero address", async function () {
       await expect(
-        chessToken
-          .connect(owner)
-          .mintTokens(hre.ethers.ZeroAddress, mintAmount)
+        chessToken.connect(owner).mintTokens(hre.ethers.ZeroAddress, mintAmount)
       ).to.be.revertedWithCustomError(chessToken, "InvalidRecipientAddress");
     });
 
@@ -191,30 +189,6 @@ describe("ChessToken", function () {
       const totalSupply = await chessToken.totalSupply();
       const expectedTotalSupply = hre.ethers.parseUnits("999999900", 18);
       expect(totalSupply).to.equal(expectedTotalSupply);
-    });
-  });
-
-  // Group tests related to receiving Ether
-  describe("Receiving Ether", function () {
-    it("Should reject incoming Ether transfers", async function () {
-      await expect(
-        owner.sendTransaction({
-          to: chessToken.target,
-          value: hre.ethers.parseEther("1"),
-        })
-      ).to.be.revertedWithCustomError(chessToken, "EtherNotAccepted");
-    });
-
-    it("Should have a receive function that reverts", async function () {
-      const receiveData = "0x";
-
-      await expect(
-        owner.sendTransaction({
-          to: chessToken.target,
-          value: hre.ethers.parseEther("1"),
-          data: receiveData,
-        })
-      ).to.be.revertedWithCustomError(chessToken, "EtherNotAccepted");
     });
   });
 });

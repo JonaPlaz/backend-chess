@@ -67,7 +67,7 @@ jobs:
       # Étape 9 : Analyse avec Slither
       - name: Run Slither Analysis
         run: |
-          slither . --config-file slither.config.json --filter-paths node_modules || true
+          slither . --config-file ./slither.config.json --filter-paths node_modules
 
       # Étape 10 : Exécution des tests Hardhat
       - name: Run Hardhat Tests

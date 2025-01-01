@@ -65,6 +65,7 @@ contract ChessFactory is Ownable, ReentrancyGuard {
 
 	/* ========== CUSTOM ERRORS ========== */
 
+	event TokensDeposited(address indexed depositor, uint256 amount);
 	error InvalidTemplateAddress();
 	error InvalidChessTokenAddress();
 	error InvalidBetAmount();
@@ -147,6 +148,8 @@ contract ChessFactory is Ownable, ReentrancyGuard {
 		}
 
 		platformBalance += amount;
+
+		emit TokensDeposited(msg.sender, amount);
 	}
 
 	/// @notice Creates a new chess game with a specified bet amount and start time.
@@ -154,7 +157,7 @@ contract ChessFactory is Ownable, ReentrancyGuard {
 	///      The `assembly` code in Clones.sol is safe and well-audited to reduce deployment costs.
 	/// @param betAmount The amount of Chess tokens to bet for the game.
 	/// @param startTime The scheduled start time for the game.
-	function createGame(uint256 betAmount, uint256 startTime) external onlyOwner {
+	function createGame(uint256 betAmount, uint256 startTime) external onlyOwner nonReentrant {
 		if (betAmount == 0) {
 			revert InvalidBetAmount();
 		}
@@ -318,6 +321,7 @@ contract ChessFactory is Ownable, ReentrancyGuard {
 		Game storage game = gameDetails[gameAddress];
 		User storage user = users[msg.sender];
 
+		// Checks
 		if (user.balance < game.betAmount) {
 			revert InsufficientBalance();
 		}
@@ -325,22 +329,26 @@ contract ChessFactory is Ownable, ReentrancyGuard {
 			revert GameAlreadyFull();
 		}
 
-		if (game.player1.userAddress == address(0)) {
-			game.player1 = user;
-			IChessTemplate(game.gameAddress).setPlayer1(user.userAddress);
-		} else if (game.player2.userAddress == address(0)) {
-			game.player2 = user;
-			IChessTemplate(game.gameAddress).setPlayer2(user.userAddress);
-
-			// Activate the game only when both players are set
-			IChessTemplate(game.gameAddress).setGameActive();
-		}
-
-		// Update balances and mappings
+		// Update state (effects)
 		user.balance -= game.betAmount;
 		platformBalance += game.betAmount;
 		playerToGame[msg.sender] = gameAddress;
 
+		if (game.player1.userAddress == address(0)) {
+			game.player1 = user;
+		} else if (game.player2.userAddress == address(0)) {
+			game.player2 = user;
+		}
+
+		// Interactions (external calls)
+		if (game.player1.userAddress == msg.sender) {
+			IChessTemplate(game.gameAddress).setPlayer1(user.userAddress);
+		} else if (game.player2.userAddress == msg.sender) {
+			IChessTemplate(game.gameAddress).setPlayer2(user.userAddress);
+			IChessTemplate(game.gameAddress).setGameActive(); // Activate only after both players are set
+		}
+
+		// Emit event
 		emit PlayerRegistered(gameAddress, msg.sender);
 	}
 

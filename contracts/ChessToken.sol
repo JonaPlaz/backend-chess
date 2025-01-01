@@ -107,16 +107,4 @@ contract ChessToken is ERC20, Ownable, ReentrancyGuard {
 
 		emit ERC20Withdrawn(token, msg.sender, amount);
 	}
-
-	// -------------------------------------------------------------
-	// Fallback Functions
-	// -------------------------------------------------------------
-
-	/**
-	 * @notice Rejects incoming Ether transfers to this contract.
-	 * @dev Prevents force-feeding Ether to the contract.
-	 */
-	receive() external payable {
-		revert EtherNotAccepted();
-	}
 }

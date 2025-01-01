@@ -155,7 +155,7 @@ contract ChessTemplate is ChessControl, ReentrancyGuard, Ownable {
 	 * @dev Can only be called by the ChessFactory contract.
 	 * @param _player1 Address of the first player.
 	 */
-	function setPlayer1(address _player1) external onlyChessFactory {
+	function setPlayer1(address _player1) external onlyChessFactory nonReentrant {
 		if (player1 != address(0)) revert AlreadyInitialized();
 		if (_player1 == address(0)) revert InvalidPlayers();
 
@@ -170,7 +170,7 @@ contract ChessTemplate is ChessControl, ReentrancyGuard, Ownable {
 	 * @dev Can only be called by the ChessFactory contract.
 	 * @param _player2 Address of the second player.
 	 */
-	function setPlayer2(address _player2) external onlyChessFactory {
+	function setPlayer2(address _player2) external onlyChessFactory nonReentrant {
 		if (player2 != address(0)) revert AlreadyInitialized();
 		if (_player2 == address(0)) revert InvalidPlayers();
 
@@ -184,7 +184,7 @@ contract ChessTemplate is ChessControl, ReentrancyGuard, Ownable {
 	 * @notice Activates the game, allowing players to start making moves.
 	 * @dev Can only be called by the ChessFactory contract.
 	 */
-	function setGameActive() external onlyChessFactory {
+	function setGameActive() external onlyChessFactory nonReentrant {
 		if (player1 == address(0) || player2 == address(0)) revert PlayersNotRegistered();
 		if (gameActive) revert GameAlreadyActive();
 

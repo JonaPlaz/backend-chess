@@ -1,6 +1,7 @@
 {
   "exclude": [
     "contracts-that-lock-ether",
-    "conformance-to-solidity-naming-conventions"
+    "conformance-to-solidity-naming-conventions",
+    "too-many-digits"
   ]
 }
