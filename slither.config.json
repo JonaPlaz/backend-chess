@@ -1,5 +1,5 @@
 {
-  "exclude": [
+  "detectors_to_exclude": [
     "contracts-that-lock-ether",
     "conformance-to-solidity-naming-conventions",
     "too-many-digits"
