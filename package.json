@@ -1,8 +1,8 @@
 {
-  "name": "backend-memory",
+  "name": "backend-chess",
   "version": "1.0.0",
-  "description": "backend memory card game",
-  "repository": "https://github.com/JonaPlaz/backend-memory.git",
+  "description": "backend chess game",
+  "repository": "https://github.com/JonaPlaz/backend-chess.git",
   "author": "JonaPlaz <jplazanet@hotmail.com>",
   "license": "MIT",
   "devDependencies": {
