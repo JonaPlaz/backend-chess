@@ -1,44 +1,50 @@
 # Nom du workflow - identifie ce workflow parmi d'autres dans le projet
 name: Test Suite
 
+# Définit les événements qui déclenchent l'exécution de ce workflow
 on:
   push:
     branches:
-      - "dev"
+      - "dev" # Déclenche le workflow sur la branche dev
 
+# Définition des jobs à exécuter dans ce workflow
 jobs:
+  # Définition d'un job nommé "tests"
   tests:
+    # Nom lisible du job, affiché dans l'interface GitHub Actions
+    name: Smart Contract Tests
+    # Spécifie explicitement la version d'Ubuntu
     runs-on: ubuntu-24.04
+    # Liste ordonnée des étapes à exécuter dans ce job
     steps:
+      # Étape 1 : Récupération du code source du dépôt
       - name: Checkout Repository
         uses: actions/checkout@v3
 
+      # Étape 2 : Configuration de l'environnement Node.js
       - name: Use Node.js 22.11.0
         uses: actions/setup-node@v3
         with:
           node-version: 22.11.0
 
-      - name: Ensure Cache Directory
-        run: mkdir -p .yarn/cache
-
+      # Étape 3 : Mise en cache des modules Yarn pour accélérer les builds futurs
       - name: Cache Yarn Modules
         id: cache-yarn-modules
         uses: actions/cache@v3
         with:
-          path: |
-            .yarn/cache
-            node_modules
-            ~/.yarn
+          path: .yarn/cache
           key: yarn-cache-${{ hashFiles('yarn.lock') }}
           restore-keys: |
             yarn-cache-
 
+      # Étape 4 : Installation des dépendances du projet
       - name: Install dependencies
         if: steps.cache-yarn-modules.outputs.cache-hit != 'true'
         run: yarn install --frozen-lockfile
 
+      # Étape 5 : Exécution des tests des smart contracts
       - name: Run Tests
-        env:
+        env: # Injection des secrets dans l'environnement
           INFURA_API_KEY: ${{ secrets.INFURA_API_KEY }}
           METAMASK_PRIVATE_KEY: ${{ secrets.METAMASK_PRIVATE_KEY }}
           ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
