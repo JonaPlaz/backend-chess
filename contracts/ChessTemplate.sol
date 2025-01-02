@@ -62,7 +62,7 @@ contract ChessTemplate is IChessTemplate, ChessControl, ReentrancyGuard, Ownable
 	event Player1Set(address indexed previousPlayer1, address indexed newPlayer1);
 	event Player2Set(address indexed previousPlayer2, address indexed newPlayer2);
 	event GameStarted(uint256 betAmount);
-	event MovePlayed(address indexed player, uint16 move);
+	event MovePlayed(address indexed player, uint16[] moves);
 	event DrawProposed(address indexed proposer);
 	event DrawAccepted(address indexed proposer, address indexed accepter);
 	event GameAbandoned(address indexed loser, address indexed winner);
@@ -198,10 +198,8 @@ contract ChessTemplate is IChessTemplate, ChessControl, ReentrancyGuard, Ownable
 
 		(uint8 outcome, , , ) = checkGameFromStart(moves);
 
-		for (uint256 i = 0; i < moves.length; i++) {
-			storedMoves.push(moves[i]);
-			emit MovePlayed(msg.sender, moves[i]);
-		}
+		storedMoves = moves;
+		emit MovePlayed(msg.sender, storedMoves);
 
 		currentOutcome = outcome;
 		lastMoveTime = block.timestamp;

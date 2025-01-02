@@ -118,7 +118,7 @@ describe("ChessTemplate", function () {
       // Player1 makes a move
       await expect(chessTemplate.connect(addr1).playMove(moves))
         .to.emit(chessTemplate, "MovePlayed")
-        .withArgs(addr1.address, moves[moves.length - 1]);
+        .withArgs(addr1.address, moves);
 
       // Verify the move was recorded
       const gameState = await chessTemplate.getGameState();

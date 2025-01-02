@@ -7,10 +7,12 @@ import "./IChessFactory.sol";
 import "./IChessTemplate.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 contract ChessFactory is IChessFactory, Ownable, ReentrancyGuard {
+	using SafeERC20 for IERC20;
 	/* ========== STATE VARIABLES ========== */
 
 	address public immutable templateAddress;
@@ -135,16 +137,10 @@ contract ChessFactory is IChessFactory, Ownable, ReentrancyGuard {
 			revert InsufficientAllowance();
 		}
 
+		chessToken.safeTransferFrom(msg.sender, address(this), amount);
+
 		// Update platform balance first
 		platformBalance += amount;
-
-		// Perform external call
-		bool success = chessToken.transferFrom(msg.sender, address(this), amount);
-		if (!success) {
-			// Revert the platform balance change if the transfer fails
-			platformBalance -= amount;
-			revert TokenTransferFailed();
-		}
 
 		emit TokensDeposited(msg.sender, amount);
 	}
