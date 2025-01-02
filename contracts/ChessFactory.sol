@@ -3,22 +3,14 @@ pragma solidity 0.8.27;
 
 /// @title ChessFactory
 /// @dev Factory contract for creating and managing chess games, handling user registrations, and managing Chess token transactions.
-
+import "./IChessFactory.sol";
+import "./IChessTemplate.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-// Interface for ChessTemplate to interact without importing the contract
-interface IChessTemplate {
-	function initialize(address _factory) external;
-	function setPlayer1(address _player1) external;
-	function setPlayer2(address _player2) external;
-	function setGameActive() external;
-	function isGameActive() external view returns (bool);
-}
-
-contract ChessFactory is Ownable, ReentrancyGuard {
+contract ChessFactory is IChessFactory, Ownable, ReentrancyGuard {
 	/* ========== STATE VARIABLES ========== */
 
 	address public immutable templateAddress;
@@ -28,6 +20,8 @@ contract ChessFactory is Ownable, ReentrancyGuard {
 	address[] public games;
 
 	uint256 public platformBalance;
+
+	bool private locked;
 
 	/* ========== STRUCTS ========== */
 
@@ -109,6 +103,13 @@ contract ChessFactory is Ownable, ReentrancyGuard {
 		_;
 	}
 
+	modifier noCrossFunctionReentrancy() {
+		require(!locked, "Reentrancy not allowed");
+		locked = true;
+		_;
+		locked = false;
+	}
+
 	/* ========== CONSTRUCTOR ========== */
 
 	/// @notice Initializes the ChessFactory with the template address.
@@ -143,15 +144,16 @@ contract ChessFactory is Ownable, ReentrancyGuard {
 			revert InsufficientAllowance();
 		}
 
-		// Update state before external call
-		uint256 newPlatformBalance = platformBalance + amount;
+		// Update platform balance first
+		platformBalance += amount;
 
-		if (!chessToken.transferFrom(msg.sender, address(this), amount)) {
+		// Perform external call
+		bool success = chessToken.transferFrom(msg.sender, address(this), amount);
+		if (!success) {
+			// Revert the platform balance change if the transfer fails
+			platformBalance -= amount;
 			revert TokenTransferFailed();
 		}
-
-		// Apply the state change after the external call succeeds
-		platformBalance = newPlatformBalance;
 
 		emit TokensDeposited(msg.sender, amount);
 	}
@@ -273,7 +275,7 @@ contract ChessFactory is Ownable, ReentrancyGuard {
 
 	/// @notice Registers a new user with a chosen pseudo.
 	/// @param pseudo The pseudo chosen by the user.
-	function registerUser(string memory pseudo) external {
+	function registerUser(string memory pseudo) external noCrossFunctionReentrancy {
 		if (users[msg.sender].userAddress != address(0)) {
 			revert UserAlreadyRegistered();
 		}
@@ -285,7 +287,6 @@ contract ChessFactory is Ownable, ReentrancyGuard {
 		}
 
 		platformBalance -= 1000 * 1e18;
-
 		users[msg.sender] = User({userAddress: msg.sender, pseudo: pseudo, balance: 1000 * 1e18});
 		userAddresses.push(msg.sender);
 

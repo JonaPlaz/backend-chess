@@ -1,25 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.27;
 
+import "./IChessTemplate.sol";
+import "./IChessFactory.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./ChessControl.sol";
 import "./ChessFactory.sol";
 
 /**
- * @title IChessFactory
- * @dev Interface for the ChessFactory contract to interact with ChessTemplate.
- */
-interface IChessFactory {
-	function distributeRewards(address player1, address player2, address winner, uint256 platformFee, uint256 reward) external;
-}
-
-/**
  * @title ChessTemplate
  * @dev A decentralized chess game contract that manages game state, player interactions, and reward distributions.
  * Inherits from ChessControl, ReentrancyGuard, and Ownable for extended functionalities and security.
  */
-contract ChessTemplate is ChessControl, ReentrancyGuard, Ownable {
+contract ChessTemplate is IChessTemplate, ChessControl, ReentrancyGuard, Ownable {
 	// ==============================
 	// ============ STATE ============
 	// ==============================
