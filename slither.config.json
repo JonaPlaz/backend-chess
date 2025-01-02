@@ -3,6 +3,6 @@
     "conformance-to-solidity-naming-conventions",
     "too-many-digits",
     "block-timestamp",
-    "low-level-calls"
+    "low-level-calls" 
   ]
 }
