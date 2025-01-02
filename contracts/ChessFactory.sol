@@ -284,9 +284,9 @@ contract ChessFactory is Ownable, ReentrancyGuard {
 			revert InsufficientPlatformBalance();
 		}
 
-		users[msg.sender] = User({userAddress: msg.sender, pseudo: pseudo, balance: 1000 * 1e18});
-
 		platformBalance -= 1000 * 1e18;
+
+		users[msg.sender] = User({userAddress: msg.sender, pseudo: pseudo, balance: 1000 * 1e18});
 		userAddresses.push(msg.sender);
 
 		emit UserRegistered(msg.sender, pseudo, 1000 * 1e18);
