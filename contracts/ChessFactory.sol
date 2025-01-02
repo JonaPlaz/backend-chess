@@ -143,11 +143,15 @@ contract ChessFactory is Ownable, ReentrancyGuard {
 			revert InsufficientAllowance();
 		}
 
+		// Update state before external call
+		uint256 newPlatformBalance = platformBalance + amount;
+
 		if (!chessToken.transferFrom(msg.sender, address(this), amount)) {
 			revert TokenTransferFailed();
 		}
 
-		platformBalance += amount;
+		// Apply the state change after the external call succeeds
+		platformBalance = newPlatformBalance;
 
 		emit TokensDeposited(msg.sender, amount);
 	}
@@ -170,7 +174,6 @@ contract ChessFactory is Ownable, ReentrancyGuard {
 
 		// Use OpenZeppelin Clones to create a new proxy contract
 		address clone = Clones.clone(templateAddress);
-		IChessTemplate(clone).initialize(address(this));
 
 		// Store game details
 		games.push(clone);
@@ -181,6 +184,8 @@ contract ChessFactory is Ownable, ReentrancyGuard {
 			betAmount: betAmount,
 			startTime: startTime
 		});
+
+		IChessTemplate(clone).initialize(address(this));
 
 		emit GameCreated(clone, betAmount, startTime);
 	}

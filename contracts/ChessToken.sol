@@ -24,9 +24,6 @@ contract ChessToken is ERC20, Ownable, ReentrancyGuard {
 	error TokenTransferFailed();
 	error EtherNotAccepted();
 
-	/// @notice Address of the authorized ChessFactory contract
-	address public chessFactory;
-
 	// -------------------------------------------------------------
 	// Events
 	// -------------------------------------------------------------
@@ -107,4 +104,5 @@ contract ChessToken is ERC20, Ownable, ReentrancyGuard {
 
 		emit ERC20Withdrawn(token, msg.sender, amount);
 	}
+
 }
