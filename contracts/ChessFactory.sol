@@ -21,8 +21,6 @@ contract ChessFactory is IChessFactory, Ownable, ReentrancyGuard {
 
 	uint256 public platformBalance;
 
-	bool private locked;
-
 	/* ========== STRUCTS ========== */
 
 	struct User {
@@ -101,13 +99,6 @@ contract ChessFactory is IChessFactory, Ownable, ReentrancyGuard {
 			revert NotParticipant();
 		}
 		_;
-	}
-
-	modifier noCrossFunctionReentrancy() {
-		require(!locked, "Reentrancy not allowed");
-		locked = true;
-		_;
-		locked = false;
 	}
 
 	/* ========== CONSTRUCTOR ========== */
@@ -275,7 +266,7 @@ contract ChessFactory is IChessFactory, Ownable, ReentrancyGuard {
 
 	/// @notice Registers a new user with a chosen pseudo.
 	/// @param pseudo The pseudo chosen by the user.
-	function registerUser(string memory pseudo) external noCrossFunctionReentrancy {
+	function registerUser(string memory pseudo) external {
 		if (users[msg.sender].userAddress != address(0)) {
 			revert UserAlreadyRegistered();
 		}
