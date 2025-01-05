@@ -53,16 +53,17 @@ contract ChessFactory is IChessFactory, Ownable, ReentrancyGuard {
 	event UserRegistered(address indexed user, string pseudo, uint256 initialBalance);
 	event GameEnded(address indexed gameAddress, address winner, uint256 winnerReward, uint256 platformFee);
 	event RewardsDistributed(address indexed player1, address indexed player2, address indexed winner, uint256 platformFee, uint256 reward);
+	event TokensDeposited(address indexed depositor, uint256 amount);
 	event ChessTokensPurchased(address indexed buyer, uint256 ethSpent, uint256 chessBought);
 	event TokensWithdrawn(address indexed owner, uint256 amount);
 	event EtherWithdrawn(address indexed owner, uint256 amount);
 
 	/* ========== CUSTOM ERRORS ========== */
 
-	event TokensDeposited(address indexed depositor, uint256 amount);
 	error InvalidTemplateAddress();
 	error InvalidChessTokenAddress();
 	error InvalidBetAmount();
+	error InvalidEthAmount();
 	error StartTimeInPast();
 	error UserAlreadyRegistered();
 	error EmptyPseudo();
@@ -71,8 +72,9 @@ contract ChessFactory is IChessFactory, Ownable, ReentrancyGuard {
 	error TokenTransferFailed();
 	error GameDoesNotExist();
 	error UserNotRegistered();
-	error InsufficientBalance();
+	error InsufficientChessBalance();
 	error GameAlreadyFull();
+	error InactiveGame();
 	error WinnerNotRegistered();
 	error InsufficientContractBalance();
 	error EtherTransferFailed();
@@ -128,10 +130,6 @@ contract ChessFactory is IChessFactory, Ownable, ReentrancyGuard {
 	/// @notice Deposits Chess tokens into the platform balance.
 	/// @param amount The amount of Chess tokens to deposit.
 	function depositTokens(uint256 amount) external onlyOwner nonReentrant {
-		if (chessTokenAddress == address(0)) {
-			revert InvalidChessTokenAddress();
-		}
-
 		IERC20 chessToken = IERC20(chessTokenAddress);
 		if (chessToken.allowance(msg.sender, address(this)) < amount) {
 			revert InsufficientAllowance();
@@ -218,10 +216,6 @@ contract ChessFactory is IChessFactory, Ownable, ReentrancyGuard {
 	/// @notice Allows the owner to withdraw a specified amount of ChessTokens from the contract.
 	/// @param amount The amount of ChessTokens to withdraw.
 	function withdrawTokens(uint256 amount) external onlyOwner nonReentrant {
-		if (chessTokenAddress == address(0)) {
-			revert InvalidChessTokenAddress();
-		}
-
 		IERC20 chessToken = IERC20(chessTokenAddress);
 		uint256 contractBalance = chessToken.balanceOf(address(this));
 
@@ -284,10 +278,10 @@ contract ChessFactory is IChessFactory, Ownable, ReentrancyGuard {
 	/// @param amountInEth The amount of Ether to spend for purchasing Chess tokens.
 	function buyChessTokens(uint256 amountInEth) external payable nonReentrant {
 		if (amountInEth == 0) {
-			revert InvalidBetAmount();
+			revert InvalidEthAmount();
 		}
 		if (msg.value != amountInEth) {
-			revert InvalidBetAmount();
+			revert InvalidEthAmount();
 		}
 		if (chessTokenAddress == address(0)) {
 			revert InvalidChessTokenAddress();
@@ -316,7 +310,7 @@ contract ChessFactory is IChessFactory, Ownable, ReentrancyGuard {
 
 		// Checks
 		if (user.balance < game.betAmount) {
-			revert InsufficientBalance();
+			revert InsufficientChessBalance();
 		}
 		if (game.player1.userAddress != address(0) && game.player2.userAddress != address(0)) {
 			revert GameAlreadyFull();
@@ -350,8 +344,8 @@ contract ChessFactory is IChessFactory, Ownable, ReentrancyGuard {
 	function joinGame(address gameAddress) external nonReentrant gameExists(gameAddress) onlyPlayer(gameAddress) {
 		Game storage game = gameDetails[gameAddress];
 		if (!IChessTemplate(gameAddress).isGameActive()) {
-			revert InvalidChessTokenAddress();
-		}
+			revert InactiveGame();
+		}	
 		if (block.timestamp < game.startTime) {
 			revert StartTimeInPast();
 		}

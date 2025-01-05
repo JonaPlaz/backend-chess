@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.27;
 
-// require(!checkForCheck(gameState, opponentState), "Invalid check state");
-// corriger bug sur invalid check state
+// require(!checkForCheck(gameState, opponentState), "Invalid check state"); à corriger // panic code 01
 
 contract ChessControl {
 	uint8 constant pawn_const = 0x1; // 001

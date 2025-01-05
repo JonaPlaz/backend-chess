@@ -20,15 +20,6 @@ contract ChessToken is ERC20, Ownable, ReentrancyGuard {
 	error InvalidAddress();
 	error InvalidRecipientAddress();
 	error AmountMustBeGreaterThanZero();
-	error CannotWithdrawChessToken();
-	error TokenTransferFailed();
-	error EtherNotAccepted();
-
-	// -------------------------------------------------------------
-	// Events
-	// -------------------------------------------------------------
-
-	event ERC20Withdrawn(address indexed token, address indexed to, uint256 amount);
 
 	// -------------------------------------------------------------
 	// Constructor
@@ -81,28 +72,4 @@ contract ChessToken is ERC20, Ownable, ReentrancyGuard {
 
 		_burn(msg.sender, amount);
 	}
-
-	// -------------------------------------------------------------
-	// Emergency Recovery Functions (Owner Only)
-	// -------------------------------------------------------------
-
-	/**
-	 * @notice Allows the owner to recover ERC20 tokens sent to this contract by mistake.
-	 * @dev Prevents the withdrawal of the ChessToken itself.
-	 * @param token The address of the ERC20 token contract to withdraw.
-	 * @param amount The amount of tokens to withdraw (in smallest units).
-	 */
-	function withdrawERC20(address token, uint256 amount) external onlyOwner nonReentrant {
-		if (token == address(this)) {
-			revert CannotWithdrawChessToken();
-		}
-		if (amount == 0) {
-			revert AmountMustBeGreaterThanZero();
-		}
-
-		IERC20(token).safeTransfer(msg.sender, amount);
-
-		emit ERC20Withdrawn(token, msg.sender, amount);
-	}
-
 }

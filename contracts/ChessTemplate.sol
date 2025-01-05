@@ -96,7 +96,6 @@ contract ChessTemplate is IChessTemplate, ChessControl, ReentrancyGuard, Ownable
 	 * @dev Restricts function access to only the registered players of the game.
 	 */
 	modifier onlyPlayers() {
-		if (player1 == address(0) || player2 == address(0)) revert PlayersNotRegistered();
 		if (msg.sender != player1 && msg.sender != player2) revert NotParticipant();
 		_;
 	}
@@ -272,8 +271,6 @@ contract ChessTemplate is IChessTemplate, ChessControl, ReentrancyGuard, Ownable
 	function acceptDraw() external onlyPlayers nonReentrant {
 		if (!gameActive) revert GameNotActive();
 		if (msg.sender == proposer) revert ProposerCannotAccept();
-		if (player1 == address(0) || player2 == address(0)) revert InvalidPlayers();
-		if (msg.sender != player1 && msg.sender != player2) revert NotParticipant();
 
 		gameActive = false;
 		status = GameStatus.Draw;
@@ -283,66 +280,69 @@ contract ChessTemplate is IChessTemplate, ChessControl, ReentrancyGuard, Ownable
 		chessFactory.distributeRewards(player1, player2, address(0), PLATFORM_FEE, DRAW_REWARD);
 	}
 
-	/**
-	 * @notice Allows the owner to declare a winner if no move has been made within the timeout period.
-	 * @dev Only callable by the contract owner.
-	 */
-	function forceWinDueToTimeout() external onlyOwner nonReentrant {
-		if (!gameActive) revert GameNotActive();
-		if (block.timestamp < lastMoveTime + MOVE_TIMEOUT) revert TimeoutNotPassed();
+	//  A IMPLEMENTER PLUS TARD - CHAINLINK AUTOMATION - 
+	// OU V1 APPEL DE CES FONCTIONS VIA LE FACTORY QUI EST OWNER DU CLONE
+	
+	// /**
+	//  * @notice Allows the owner to declare a winner if no move has been made within the timeout period.
+	//  * @dev Only callable by the contract owner.
+	//  */
+	// function forceWinDueToTimeout() external onlyOwner nonReentrant {
+	// 	if (!gameActive) revert GameNotActive();
+	// 	if (block.timestamp < lastMoveTime + MOVE_TIMEOUT) revert TimeoutNotPassed();
 
-		address loser = _getCurrentPlayerTurn();
-		address winner = (loser == player1) ? player2 : player1;
+	// 	address loser = _getCurrentPlayerTurn();
+	// 	address winner = (loser == player1) ? player2 : player1;
 
-		// Finalize the game by declaring the winner
-		_finalizeForcedWin(winner, loser);
-	}
+	// 	// Finalize the game by declaring the winner
+	// 	_finalizeForcedWin(winner, loser);
+	// }
 
-	/**
-	 * @notice Allows the owner to force a draw if the opponent has not responded within the timeout period.
-	 * @dev Only callable by the contract owner.
-	 */
-	function forceDrawDueToTimeout() external onlyOwner nonReentrant {
-		if (!gameActive) revert GameNotActive();
-		if (block.timestamp < lastMoveTime + MOVE_TIMEOUT) revert TimeoutNotPassed();
+	// /**
+	//  * @notice Allows the owner to force a draw if the opponent has not responded within the timeout period.
+	//  * @dev Only callable by the contract owner.
+	//  */
+	// function forceDrawDueToTimeout() external onlyOwner nonReentrant {
+	// 	if (!gameActive) revert GameNotActive();
+	// 	if (block.timestamp < lastMoveTime + MOVE_TIMEOUT) revert TimeoutNotPassed();
 
-		gameActive = false;
-		status = GameStatus.Draw;
+	// 	gameActive = false;
+	// 	status = GameStatus.Draw;
 
-		emit GameForcedDraw(player1, player2);
-		emit GameEndedForTimeout(address(0), address(0));
+	// 	emit GameForcedDraw(player1, player2);
+	// 	emit GameEndedForTimeout(address(0), address(0));
 
-		chessFactory.distributeRewards(player1, player2, address(0), PLATFORM_FEE, DRAW_REWARD);
-	}
+	// 	chessFactory.distributeRewards(player1, player2, address(0), PLATFORM_FEE, DRAW_REWARD);
+	// }
 
-	/**
-	 * @notice Determines which player's turn it is based on the number of moves made.
-	 * @dev Assumes player1 makes odd-numbered moves and player2 makes even-numbered moves.
-	 * @return address of the player whose turn it is.
-	 */
-	function _getCurrentPlayerTurn() internal view returns (address) {
-		// Assume player1 plays odd moves and player2 plays even moves
-		if (moveCount % 2 == 0) {
-			return player1;
-		} else {
-			return player2;
-		}
-	}
+	// /**
+	//  * @notice Determines which player's turn it is based on the number of moves made.
+	//  * @dev Assumes player1 makes odd-numbered moves and player2 makes even-numbered moves.
+	//  * @return address of the player whose turn it is.
+	//  */
+	// function _getCurrentPlayerTurn() internal view returns (address) {
+	// 	// Assume player1 plays odd moves and player2 plays even moves
+	// 	if (moveCount % 2 == 0) {
+	// 		return player1;
+	// 	} else {
+	// 		return player2;
+	// 	}
+	// }
 
-	/**
-	 * @notice Finalizes the game by declaring a forced winner due to timeout.
-	 * @dev Internal function following the Checks-Effects-Interactions pattern.
-	 * @param winner Address of the player who wins by timeout.
-	 * @param loser Address of the player who loses by timeout.
-	 */
-	function _finalizeForcedWin(address winner, address loser) internal {
-		gameActive = false;
-		status = GameStatus.Ended;
+	// /**
+	//  * @notice Finalizes the game by declaring a forced winner due to timeout.
+	//  * @dev Internal function following the Checks-Effects-Interactions pattern.
+	//  * @param winner Address of the player who wins by timeout.
+	//  * @param loser Address of the player who loses by timeout.
+	//  */
+	// function _finalizeForcedWin(address winner, address loser) internal {
+	// 	gameActive = false;
+	// 	status = GameStatus.Ended;
 
-		emit GameEndedForTimeout(winner, loser);
+	// 	emit GameEndedForTimeout(winner, loser);
 
-		chessFactory.distributeRewards(player1, player2, winner, PLATFORM_FEE, WINNER_REWARD);
-	}
+	// 	chessFactory.distributeRewards(player1, player2, winner, PLATFORM_FEE, WINNER_REWARD);
+	// }
 
 	/**
 	 * @notice Retrieves the current state of the game.

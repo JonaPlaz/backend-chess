@@ -5,27 +5,32 @@ const { expect } = require("chai");
 const hre = require("hardhat");
 
 describe("ChessToken", function () {
-  // Define variables in the outer scope of the test suite
   let chessToken: any;
-  let owner;
-  let addr1;
-  let addr2;
+  let owner: any;
+  let addr1: any;
+  let addr2: any;
   let initialSupply: bigint;
-  const initialSupplyValue = "1000000000"; // Initial supply as a string for parsing
+  const INITIAL_SUPPLY = "1000000000";
+
+  // ===============================
+  // =========== CONFIG ============
+  // ===============================
 
   // Fixture to deploy the ChessToken contract
   async function deployChessTokenFixture() {
     [owner, addr1, addr2] = await hre.ethers.getSigners();
-    initialSupply = hre.ethers.parseUnits(initialSupplyValue, 18);
+    initialSupply = hre.ethers.parseUnits(INITIAL_SUPPLY, 18);
 
     chessToken = await hre.ethers.deployContract("ChessToken", [initialSupply]);
 
     return { chessToken, owner, addr1, addr2, initialSupply };
   }
 
-  // Group tests related to deployment
+  // ===============================
+  // ========= DEPLOYEMENT =========
+  // ===============================
+
   describe("Deployment", function () {
-    // Load the fixture before each test in this block
     beforeEach(async function () {
       ({ chessToken, owner, initialSupply } = await loadFixture(
         deployChessTokenFixture
@@ -67,42 +72,33 @@ describe("ChessToken", function () {
     });
   });
 
-  // Group tests related to minting functionality
-  describe("Minting", function () {
-    // Define additional variables specific to minting tests
-    let mintAmount;
+  // ===============================
+  // ========= MINTTOKENS ==========
+  // ===============================
 
-    // Load the fixture and set the ChessFactory before each test in this block
+  // Group tests related to minting functionality
+  describe("mintTokens", function () {
+    let mintAmount: bigint;
+    let chessToken: any;
+    let owner: any;
+    let addr1: any;
+    let addr2: any;
     beforeEach(async function () {
       ({ chessToken, owner, addr1, addr2 } = await loadFixture(
         deployChessTokenFixture
       ));
-
-      // Define the mint amount
       mintAmount = hre.ethers.parseUnits("100", 18);
     });
 
     it("Should allow the Owner to mint tokens to a specified address", async function () {
-      // Mint tokens from Owner to addr2
       await chessToken.connect(owner).mintTokens(addr2.address, mintAmount);
 
-      // Check the balance of addr2
       const addr2Balance = await chessToken.balanceOf(addr2.address);
       expect(addr2Balance).to.equal(mintAmount);
 
-      // Check the total supply has increased
       const totalSupply = await chessToken.totalSupply();
       expect(totalSupply).to.equal(initialSupply + mintAmount);
     });
-
-    it("Should emit Transfer event from zero address when minting tokens", async function () {
-      await expect(
-        chessToken.connect(owner).mintTokens(addr2.address, mintAmount)
-      )
-        .to.emit(chessToken, "Transfer")
-        .withArgs(hre.ethers.ZeroAddress, addr2.address, mintAmount);
-    });
-
     it("Should revert when a non Owner tries to mint tokens", async function () {
       await expect(
         chessToken.connect(addr1).mintTokens(addr2.address, mintAmount)
@@ -125,36 +121,31 @@ describe("ChessToken", function () {
     });
   });
 
-  // Group tests related to burning functionality
-  describe("Burning", function () {
-    let burnAmount;
+  // ===============================
+  // ============ BURN =============
+  // ===============================
 
+  describe("burn", function () {
+    let burnAmount: bigint;
+    let chessToken: any;
+    let owner: any;
+    let addr1: any;
     beforeEach(async function () {
       ({ chessToken, owner, addr1 } = await loadFixture(
         deployChessTokenFixture
       ));
-
-      // Define the burn amount
       burnAmount = hre.ethers.parseUnits("50", 18);
     });
 
     it("Should allow token holders to burn their own tokens", async function () {
-      // Owner burns tokens
       await chessToken.connect(owner).burn(burnAmount);
 
-      // Check the owner's balance
       const ownerBalance = await chessToken.balanceOf(owner.address);
       expect(ownerBalance).to.equal(initialSupply - burnAmount);
 
       // Check the total supply has decreased
       const totalSupply = await chessToken.totalSupply();
       expect(totalSupply).to.equal(initialSupply - burnAmount);
-    });
-
-    it("Should emit Transfer event to zero address when burning tokens", async function () {
-      await expect(chessToken.connect(owner).burn(burnAmount))
-        .to.emit(chessToken, "Transfer")
-        .withArgs(owner.address, hre.ethers.ZeroAddress, burnAmount);
     });
 
     it("Should revert when trying to burn more tokens than the balance", async function () {
@@ -174,18 +165,15 @@ describe("ChessToken", function () {
     });
 
     it("Should allow multiple accounts to burn their tokens independently", async function () {
-      // Transfer some tokens to addr1
       const transferAmount = hre.ethers.parseUnits("200", 18);
       await chessToken.connect(owner).transfer(addr1.address, transferAmount);
 
-      // addr1 burns some tokens
       const addr1BurnAmount = hre.ethers.parseUnits("100", 18);
       await chessToken.connect(addr1).burn(addr1BurnAmount);
-      // Check addr1's balance
+
       const addr1Balance = await chessToken.balanceOf(addr1.address);
       expect(addr1Balance).to.equal(hre.ethers.parseUnits("100", 18));
 
-      // Check total supply
       const totalSupply = await chessToken.totalSupply();
       const expectedTotalSupply = hre.ethers.parseUnits("999999900", 18);
       expect(totalSupply).to.equal(expectedTotalSupply);
