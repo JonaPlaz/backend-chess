@@ -128,6 +128,29 @@ contract ChessFactory is IChessFactory, Ownable, ReentrancyGuard {
 		chessTokenAddress = _chessToken;
 	}
 
+	/// @notice Permet au propriétaire de déposer des tokens dans la balance de la plateforme.
+	/// @param amount Le montant de tokens à déposer.
+	function ownerDepositTokens(uint256 amount) external onlyOwner nonReentrant {
+		if (amount == 0) {
+			revert InvalidChessAmount(); // Vérifie que le montant est valide.
+		}
+
+		IERC20 chessToken = IERC20(chessTokenAddress);
+
+		// Vérifie si l'owner a donné une allowance suffisante
+		if (chessToken.allowance(msg.sender, address(this)) < amount) {
+			revert InsufficientAllowance();
+		}
+
+		// Transfert des tokens du propriétaire vers la plateforme
+		chessToken.safeTransferFrom(msg.sender, address(this), amount);
+
+		// Mise à jour de la balance de la plateforme
+		platformBalance += amount;
+
+		emit TokensDeposited(msg.sender, amount);
+	}
+
 	/// @notice Permet au propriétaire de retirer tous les Chess tokens du contrat.
 	function withdrawAllChessTokens() external onlyOwner nonReentrant {
 		IERC20 chessToken = IERC20(chessTokenAddress);
@@ -216,7 +239,7 @@ contract ChessFactory is IChessFactory, Ownable, ReentrancyGuard {
 	/// @notice Permet au propriétaire de retirer tout l'ETH du contrat.
 	function withdrawAllEther() external onlyOwner nonReentrant {
 		uint256 contractEthBalance = address(this).balance;
-		
+
 		if (contractEthBalance <= 0) {
 			revert InsufficientContractBalance();
 		}
