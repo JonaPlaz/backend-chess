@@ -264,7 +264,7 @@ contract ChessFactory is IChessFactory, Ownable, ReentrancyGuard {
 		if (bytes(pseudo).length == 0) {
 			revert EmptyPseudo();
 		}
-		if (platformBalance < 1000 * 1e18) {
+		if (platformBalance < 3000 * 1e18) {
 			revert InsufficientPlatformBalance();
 		}
 
@@ -277,7 +277,7 @@ contract ChessFactory is IChessFactory, Ownable, ReentrancyGuard {
 
 	/// @notice Allows users to purchase Chess tokens by sending Ether.
 	/// @param amountInEth The amount of Ether to spend for purchasing Chess tokens.
-	function buyChessTokens(uint256 amountInEth) external payable nonReentrant {
+	function buyChessTokens(uint256 amountInEth) external payable nonReentrant onlyUser(msg.sender) {
 		if (amountInEth == 0) {
 			revert InvalidEthAmount();
 		}
@@ -301,7 +301,7 @@ contract ChessFactory is IChessFactory, Ownable, ReentrancyGuard {
 		emit ChessTokensPurchased(msg.sender, msg.value, amountToBuy);
 	}
 
-	function withdrawTokens(uint256 amount) external nonReentrant {
+	function withdrawTokens(uint256 amount) external nonReentrant onlyUser(msg.sender) {
 		User storage user = users[msg.sender];
 		if (user.balance < amount) {
 			revert InsufficientChessBalance();
@@ -317,7 +317,7 @@ contract ChessFactory is IChessFactory, Ownable, ReentrancyGuard {
 		emit TokensWithdrawn(msg.sender, amount);
 	}
 
-	function depositTokens(uint256 amount) external nonReentrant {
+	function depositTokens(uint256 amount) external nonReentrant onlyUser(msg.sender) {
 		if (amount == 0) {
 			revert InvalidChessAmount();
 		}
