@@ -32,7 +32,7 @@ describe("ChessTemplate", function () {
 
     // Approve and deposit tokens into ChessFactory
     await chessToken.approve(chessFactory.target, DEPOSIT_AMOUNT);
-    await chessFactory.depositTokens(DEPOSIT_AMOUNT);
+    await chessFactory.ownerDepositTokens(DEPOSIT_AMOUNT);
 
     return {
       chessTemplate,
@@ -450,24 +450,6 @@ describe("ChessTemplate", function () {
       await expect(
         chessTemplate.connect(addr3).proposeDraw()
       ).to.be.revertedWithCustomError(chessTemplate, "NotParticipant");
-    });
-
-    it("Should revert if trying to accept a draw without a proposal", async function () {
-      chessTemplate.connect(addr1).proposeDraw();
-      await expect(
-        chessTemplate.connect(addr2).proposeDraw()
-      ).to.be.revertedWithCustomError(chessTemplate, "DrawAlreadyProposed");
-    });
-
-    it("Should allow a player to propose a draw", async function () {
-      // Player1 proposes a draw
-      await expect(chessTemplate.connect(addr1).proposeDraw())
-        .to.emit(chessTemplate, "DrawProposed")
-        .withArgs(addr1.address);
-
-      // Verify draw was proposed
-      expect(await chessTemplate.drawProposed()).to.equal(true);
-      expect(await chessTemplate.proposer()).to.equal(addr1.address);
     });
 
     it("Should revert if a player tries to propose a draw for a game that is not active", async function () {

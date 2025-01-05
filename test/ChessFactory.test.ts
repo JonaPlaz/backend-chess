@@ -25,7 +25,7 @@ describe("ChessFactory", function () {
     await chessFactory.setChessToken(chessToken.target);
     const depositAmount = hre.ethers.parseUnits("100000", 18);
     await chessToken.approve(chessFactory.target, depositAmount);
-    await chessFactory.depositTokens(depositAmount);
+    await chessFactory.ownerDepositTokens(depositAmount);
 
     return {
       chessFactory,
@@ -202,10 +202,9 @@ describe("ChessFactory", function () {
   describe("depositTokens", function () {
     let chessFactory: any;
     let chessToken: any;
-    let addr1: any;
     let owner: any;
     beforeEach(async function () {
-      ({ chessFactory, chessToken, addr1, owner } = await loadFixture(
+      ({ chessFactory, chessToken, owner } = await loadFixture(
         deployFactoryFixture
       ));
     });
@@ -214,7 +213,7 @@ describe("ChessFactory", function () {
       // Deposit additional tokens
       const depositAmount = hre.ethers.parseUnits("50000", 18);
       await chessToken.approve(chessFactory.target, depositAmount);
-      await expect(chessFactory.depositTokens(depositAmount))
+      await expect(chessFactory.ownerDepositTokens(depositAmount))
         .to.emit(chessFactory, "TokensDeposited")
         .withArgs(owner.address, depositAmount);
 
@@ -236,7 +235,7 @@ describe("ChessFactory", function () {
 
       // Tente de déposer sans allowance suffisante => revert attendu
       await expect(
-        chessFactory.depositTokens(depositAmount)
+        chessFactory.ownerDepositTokens(depositAmount)
       ).to.be.revertedWithCustomError(chessFactory, "InsufficientAllowance");
     });
   });
@@ -494,28 +493,27 @@ describe("ChessFactory", function () {
       ));
     });
     it("Should allow the owner to withdraw ChessTokens", async function () {
-      // Owner withdraws 5000 ChessTokens
-      const withdrawAmount = hre.ethers.parseUnits("50000", 18);
-      await chessFactory.withdrawTokens(withdrawAmount);
+      await chessFactory.connect(addr1).registerUser("Player1");
+
+      const withdrawAmount = hre.ethers.parseUnits("1000", 18);
+      await chessFactory.connect(addr1).withdrawTokens(withdrawAmount);
 
       // Check owner's ChessToken balance
       const ownerBalance = await chessToken.balanceOf(owner.address);
-      expect(ownerBalance).to.equal(hre.ethers.parseUnits("950000", 18)); // Initial 10000000 - 100000 deposited + 50000 withdrawn
+      expect(ownerBalance).to.equal(hre.ethers.parseUnits("900000", 18));
 
       // Check platform balance
       const platformBalance = await chessFactory.platformBalance();
-      expect(platformBalance).to.equal(hre.ethers.parseUnits("50000", 18)); // 100000 initial - 50000 withdrawn
+      expect(platformBalance).to.equal(hre.ethers.parseUnits("98000", 18));
     });
 
     it("Should revert if withdrawing more ChessTokens than the platform balance", async function () {
+      await chessFactory.connect(addr1).registerUser("Player1");
       // Attempt to withdraw more tokens than available
       const withdrawAmount = hre.ethers.parseUnits("200000", 18); // Platform balance is 10000
       await expect(
-        chessFactory.withdrawTokens(withdrawAmount)
-      ).to.be.revertedWithCustomError(
-        chessFactory,
-        "InsufficientChessBalance"
-      );
+        chessFactory.connect(addr1).withdrawTokens(withdrawAmount)
+      ).to.be.revertedWithCustomError(chessFactory, "InsufficientChessBalance");
     });
   });
 
@@ -611,9 +609,7 @@ describe("ChessFactory", function () {
     });
     it("Should revert if platformBalance < 1000 * 1e18 (InsufficientPlatformBalance)", async function () {
       // Pour forcer le balance de la plateforme à être insuffisant, on retire tous les tokens
-      // (ou suffisamment pour qu'il reste < 1000 * 1e18).
-      const platformBalance = await chessFactory.platformBalance();
-      await chessFactory.withdrawTokens(platformBalance);
+      await chessFactory.withdrawAllChessTokens();
 
       // Vérifions qu'il ne reste vraiment plus rien
       const newPlatformBalance = await chessFactory.platformBalance();
@@ -641,6 +637,7 @@ describe("ChessFactory", function () {
     });
 
     it("should revert if the amount of Ether is zero", async function () {
+      await chessFactory.connect(addr1).registerUser("Player1");
       await expect(
         chessFactory.connect(addr1).buyChessTokens(0)
       ).to.be.revertedWithCustomError(chessFactory, "InvalidEthAmount");
@@ -648,6 +645,7 @@ describe("ChessFactory", function () {
 
     it("should revert if the sent Ether does not match the specified amountInEth", async function () {
       const amountInEth = hre.ethers.parseEther("1");
+      await chessFactory.connect(addr1).registerUser("Player1");
 
       await expect(
         chessFactory.connect(addr1).buyChessTokens(amountInEth)

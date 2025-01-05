@@ -160,6 +160,9 @@ contract ChessFactory is IChessFactory, Ownable, ReentrancyGuard {
 			revert InsufficientContractBalance();
 		}
 
+		// Met à jour la balance de la plateforme
+		platformBalance -= contractBalance;
+
 		// Effectue le transfert
 		chessToken.safeTransfer(msg.sender, contractBalance);
 
@@ -264,7 +267,7 @@ contract ChessFactory is IChessFactory, Ownable, ReentrancyGuard {
 		if (bytes(pseudo).length == 0) {
 			revert EmptyPseudo();
 		}
-		if (platformBalance < 3000 * 1e18) {
+		if (platformBalance < 1000 * 1e18) {
 			revert InsufficientPlatformBalance();
 		}
 
