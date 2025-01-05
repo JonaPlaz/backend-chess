@@ -133,7 +133,7 @@ contract ChessFactory is IChessFactory, Ownable, ReentrancyGuard {
 		IERC20 chessToken = IERC20(chessTokenAddress);
 		uint256 contractBalance = chessToken.balanceOf(address(this));
 
-		if (contractBalance == 0) {
+		if (contractBalance <= 0) {
 			revert InsufficientContractBalance();
 		}
 
@@ -216,8 +216,8 @@ contract ChessFactory is IChessFactory, Ownable, ReentrancyGuard {
 	/// @notice Permet au propriétaire de retirer tout l'ETH du contrat.
 	function withdrawAllEther() external onlyOwner nonReentrant {
 		uint256 contractEthBalance = address(this).balance;
-
-		if (contractEthBalance == 0) {
+		
+		if (contractEthBalance <= 0) {
 			revert InsufficientContractBalance();
 		}
 

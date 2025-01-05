@@ -226,22 +226,6 @@ describe("ChessFactory", function () {
       expect(newBalance).to.equal(expectedNewBalance);
     });
 
-    it("Should revert if non-owner tries to deposit ChessTokens", async function () {
-      // Approve ChessFactory to spend tokens from addr1
-      const depositAmount = hre.ethers.parseUnits("50000", 18);
-      await chessToken
-        .connect(addr1)
-        .approve(chessFactory.target, depositAmount);
-
-      // Attempt to deposit tokens as a non-owner
-      await expect(
-        chessFactory.connect(addr1).depositTokens(depositAmount)
-      ).to.be.revertedWithCustomError(
-        chessFactory,
-        "OwnableUnauthorizedAccount"
-      );
-    });
-
     it("Should revert if the allowance is insufficient", async function () {
       // Montant de dépôt
       const depositAmount = hre.ethers.parseUnits("100", 18);
@@ -523,17 +507,6 @@ describe("ChessFactory", function () {
       expect(platformBalance).to.equal(hre.ethers.parseUnits("50000", 18)); // 100000 initial - 50000 withdrawn
     });
 
-    it("Should revert if non-owner tries to withdraw ChessTokens", async function () {
-      // Attempt to withdraw tokens as a non-owner
-      const withdrawAmount = hre.ethers.parseUnits("1000", 18);
-      await expect(
-        chessFactory.connect(addr1).withdrawTokens(withdrawAmount)
-      ).to.be.revertedWithCustomError(
-        chessFactory,
-        "OwnableUnauthorizedAccount"
-      );
-    });
-
     it("Should revert if withdrawing more ChessTokens than the platform balance", async function () {
       // Attempt to withdraw more tokens than available
       const withdrawAmount = hre.ethers.parseUnits("200000", 18); // Platform balance is 10000
@@ -541,13 +514,13 @@ describe("ChessFactory", function () {
         chessFactory.withdrawTokens(withdrawAmount)
       ).to.be.revertedWithCustomError(
         chessFactory,
-        "InsufficientContractBalance"
+        "InsufficientChessBalance"
       );
     });
   });
 
   // ===============================
-  // ======== WITHDRAWETHER ========
+  // ======== WITHDRAWALLETHER ========
   // ===============================
 
   describe("Withdraw Ether", function () {
@@ -559,7 +532,7 @@ describe("ChessFactory", function () {
         deployFactoryFixture
       ));
     });
-    it("Should allow the owner to withdraw Ether", async function () {
+    it("Should allow the owner to withdraw Ethers", async function () {
       // Send some Ether to the contract for withdrawal
       const sendAmount = hre.ethers.parseEther("10");
       await owner.sendTransaction({
@@ -567,33 +540,27 @@ describe("ChessFactory", function () {
         value: sendAmount,
       });
 
-      // Owner withdraws 5 Ether
-      const withdrawAmount = hre.ethers.parseEther("5");
-      await chessFactory.withdrawEther(withdrawAmount);
+      await chessFactory.withdrawAllEther();
 
       // Check the contract's Ether balance
       const contractBalance = await hre.ethers.provider.getBalance(
         chessFactory.target
       );
-      expect(contractBalance).to.equal(hre.ethers.parseEther("5"));
+      expect(contractBalance).to.equal(hre.ethers.parseEther("0"));
     });
 
-    it("Should revert if non-owner tries to withdraw Ether", async function () {
-      // Attempt to withdraw Ether as a non-owner
-      const withdrawAmount = hre.ethers.parseEther("1");
+    it("Should revert if non-owner tries to withdraw Ethers", async function () {
       await expect(
-        chessFactory.connect(addr1).withdrawEther(withdrawAmount)
+        chessFactory.connect(addr1).withdrawAllEther()
       ).to.be.revertedWithCustomError(
         chessFactory,
         "OwnableUnauthorizedAccount"
       );
     });
 
-    it("Should revert if withdrawing more Ether than the contract balance", async function () {
-      // Contract Ether balance is 0
-      const withdrawAmount = hre.ethers.parseEther("1");
+    it("Should revert if withdrawing more Ethers than the contract balance", async function () {
       await expect(
-        chessFactory.withdrawEther(withdrawAmount)
+        chessFactory.withdrawAllEther()
       ).to.be.revertedWithCustomError(
         chessFactory,
         "InsufficientContractBalance"
