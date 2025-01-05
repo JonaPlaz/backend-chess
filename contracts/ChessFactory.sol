@@ -63,6 +63,7 @@ contract ChessFactory is IChessFactory, Ownable, ReentrancyGuard {
 	error InvalidTemplateAddress();
 	error InvalidChessTokenAddress();
 	error InvalidBetAmount();
+	error InvalidChessAmount();
 	error InvalidEthAmount();
 	error StartTimeInPast();
 	error UserAlreadyRegistered();
@@ -127,20 +128,19 @@ contract ChessFactory is IChessFactory, Ownable, ReentrancyGuard {
 		chessTokenAddress = _chessToken;
 	}
 
-	/// @notice Deposits Chess tokens into the platform balance.
-	/// @param amount The amount of Chess tokens to deposit.
-	function depositTokens(uint256 amount) external onlyOwner nonReentrant {
+	/// @notice Permet au propriétaire de retirer tous les Chess tokens du contrat.
+	function withdrawAllChessTokens() external onlyOwner nonReentrant {
 		IERC20 chessToken = IERC20(chessTokenAddress);
-		if (chessToken.allowance(msg.sender, address(this)) < amount) {
-			revert InsufficientAllowance();
+		uint256 contractBalance = chessToken.balanceOf(address(this));
+
+		if (contractBalance == 0) {
+			revert InsufficientContractBalance();
 		}
 
-		chessToken.safeTransferFrom(msg.sender, address(this), amount);
+		// Effectue le transfert
+		chessToken.safeTransfer(msg.sender, contractBalance);
 
-		// Update platform balance first
-		platformBalance += amount;
-
-		emit TokensDeposited(msg.sender, amount);
+		emit TokensWithdrawn(msg.sender, contractBalance);
 	}
 
 	/// @notice Creates a new chess game with a specified bet amount and start time.
@@ -213,43 +213,21 @@ contract ChessFactory is IChessFactory, Ownable, ReentrancyGuard {
 		emit RewardsDistributed(player1, player2, winner, platformFee, reward);
 	}
 
-	/// @notice Allows the owner to withdraw a specified amount of ChessTokens from the contract.
-	/// @param amount The amount of ChessTokens to withdraw.
-	function withdrawTokens(uint256 amount) external onlyOwner nonReentrant {
-		IERC20 chessToken = IERC20(chessTokenAddress);
-		uint256 contractBalance = chessToken.balanceOf(address(this));
-
-		if (amount > contractBalance) {
-			revert InsufficientContractBalance();
-		}
-
-		// Update the platform balance
-		platformBalance -= amount;
-
-		(bool success, bytes memory data) = address(chessToken).call(abi.encodeWithSelector(IERC20.transfer.selector, msg.sender, amount));
-
-		if (!success || (data.length > 0 && !abi.decode(data, (bool)))) {
-			revert TokenTransferFailed();
-		}
-
-		emit TokensWithdrawn(msg.sender, amount);
-	}
-
-	/// @notice Allows the owner to withdraw a specified amount of Ether from the contract.
-	/// @param amount The amount of Ether (in wei) to withdraw.
-	function withdrawEther(uint256 amount) external onlyOwner nonReentrant {
+	/// @notice Permet au propriétaire de retirer tout l'ETH du contrat.
+	function withdrawAllEther() external onlyOwner nonReentrant {
 		uint256 contractEthBalance = address(this).balance;
 
-		if (amount > contractEthBalance) {
+		if (contractEthBalance == 0) {
 			revert InsufficientContractBalance();
 		}
 
-		(bool success, ) = msg.sender.call{value: amount}("");
+		// Effectue le transfert
+		(bool success, ) = msg.sender.call{value: contractEthBalance}("");
 		if (!success) {
 			revert EtherTransferFailed();
 		}
 
-		emit EtherWithdrawn(msg.sender, amount);
+		emit EtherWithdrawn(msg.sender, contractEthBalance);
 	}
 
 	/* ========== USER FUNCTIONS ========== */
@@ -300,6 +278,41 @@ contract ChessFactory is IChessFactory, Ownable, ReentrancyGuard {
 		emit ChessTokensPurchased(msg.sender, msg.value, amountToBuy);
 	}
 
+	function withdrawTokens(uint256 amount) external nonReentrant {
+		User storage user = users[msg.sender];
+		if (user.balance < amount) {
+			revert InsufficientChessBalance();
+		}
+
+		// Met à jour les soldes
+		user.balance -= amount;
+		platformBalance -= amount;
+
+		IERC20 chessToken = IERC20(chessTokenAddress);
+		chessToken.safeTransfer(msg.sender, amount);
+
+		emit TokensWithdrawn(msg.sender, amount);
+	}
+
+	function depositTokens(uint256 amount) external nonReentrant {
+		if (amount == 0) {
+			revert InvalidChessAmount();
+		}
+
+		IERC20 chessToken = IERC20(chessTokenAddress);
+		if (chessToken.allowance(msg.sender, address(this)) < amount) {
+			revert InsufficientAllowance();
+		}
+
+		chessToken.safeTransferFrom(msg.sender, address(this), amount);
+
+		// Met à jour les soldes
+		users[msg.sender].balance += amount;
+		platformBalance += amount;
+
+		emit TokensDeposited(msg.sender, amount);
+	}
+
 	/* ========== GAME FUNCTIONS ========== */
 
 	/// @notice Registers the caller to a specific game.
@@ -345,7 +358,7 @@ contract ChessFactory is IChessFactory, Ownable, ReentrancyGuard {
 		Game storage game = gameDetails[gameAddress];
 		if (!IChessTemplate(gameAddress).isGameActive()) {
 			revert InactiveGame();
-		}	
+		}
 		if (block.timestamp < game.startTime) {
 			revert StartTimeInPast();
 		}
