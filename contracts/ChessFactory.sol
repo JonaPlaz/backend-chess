@@ -310,9 +310,7 @@ contract ChessFactory is IChessFactory, Ownable, ReentrancyGuard {
 			revert InsufficientChessBalance();
 		}
 
-		// Met à jour les soldes
 		user.balance -= amount;
-		platformBalance -= amount;
 
 		IERC20 chessToken = IERC20(chessTokenAddress);
 		chessToken.safeTransfer(msg.sender, amount);
@@ -332,9 +330,7 @@ contract ChessFactory is IChessFactory, Ownable, ReentrancyGuard {
 
 		chessToken.safeTransferFrom(msg.sender, address(this), amount);
 
-		// Met à jour les soldes
 		users[msg.sender].balance += amount;
-		platformBalance += amount;
 
 		emit TokensDeposited(msg.sender, amount);
 	}

@@ -501,10 +501,6 @@ describe("ChessFactory", function () {
       // Check owner's ChessToken balance
       const ownerBalance = await chessToken.balanceOf(owner.address);
       expect(ownerBalance).to.equal(hre.ethers.parseUnits("900000", 18));
-
-      // Check platform balance
-      const platformBalance = await chessFactory.platformBalance();
-      expect(platformBalance).to.equal(hre.ethers.parseUnits("98000", 18));
     });
 
     it("Should revert if withdrawing more ChessTokens than the platform balance", async function () {
